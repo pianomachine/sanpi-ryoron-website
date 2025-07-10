@@ -15,156 +15,174 @@ class HomeController extends Controller
 {
     public function index(Request $request)
     {
-        $sort = $request->get('sort', 'hot'); // hot, new, top, rising
+        try {
+            $sort = $request->get('sort', 'hot'); // hot, new, top, rising
 
-        // データベースから投稿を取得（コミュニティが設定されているもののみ）
-        $query = Topic::with(['user', 'community'])
-            ->where('status', 'active')
-            ->whereNotNull('community_id');
+            // データベースから投稿を取得（コミュニティが設定されているもののみ）
+            $query = Topic::with(['user', 'community'])
+                ->where('status', 'active')
+                ->whereNotNull('community_id');
 
-        // ソート
-        switch ($sort) {
-            case 'new':
-                $query->orderBy('created_at', 'desc');
-                break;
-            case 'top':
-                $query->orderBy('score', 'desc');
-                break;
-            case 'rising':
-                $query->where('created_at', '>=', now()->subHours(24))
-                      ->orderBy('score', 'desc');
-                break;
-            case 'hot':
-            default:
-                $query->orderByRaw('(score + comments_count * 0.5) / (JULIANDAY("now") - JULIANDAY(created_at) + 1) DESC');
-                break;
-        }
-
-        $allTopics = $query->get();
-
-        // hotの場合のみ各コミュニティから1つの代表投稿を選択、それ以外は全投稿表示
-        if ($sort === 'hot') {
-            $representativeTopics = collect();
-            $topicsByCommunityCached = $allTopics->groupBy('community_id');
-            
-            foreach ($topicsByCommunityCached as $communityId => $communityTopics) {
-                // 各コミュニティから最もスコアの高い投稿を代表として選択
-                $representativeTopic = $communityTopics->sortByDesc('score')->first();
-                if ($representativeTopic) {
-                    $representativeTopics->push($representativeTopic);
-                }
+            // ソート
+            switch ($sort) {
+                case 'new':
+                    $query->orderBy('created_at', 'desc');
+                    break;
+                case 'top':
+                    $query->orderBy('score', 'desc');
+                    break;
+                case 'rising':
+                    $query->where('created_at', '>=', now()->subHours(24))
+                          ->orderBy('score', 'desc');
+                    break;
+                case 'hot':
+                default:
+                    // PostgreSQL対応: JULIANDAY関数をEXTRACT(EPOCH)に変更
+                    if (config('database.default') === 'pgsql') {
+                        $query->orderByRaw('(score + comments_count * 0.5) / (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM created_at) + 86400) DESC');
+                    } else {
+                        // SQLite用
+                        $query->orderByRaw('(score + comments_count * 0.5) / (JULIANDAY("now") - JULIANDAY(created_at) + 1) DESC');
+                    }
+                    break;
             }
-            $topics = $representativeTopics;
-        } else {
-            // new, top, risingの場合は全投稿を表示
-            $topics = $allTopics;
+
+            $allTopics = $query->get();
+
+            // データが存在しない場合のフォールバック
+            if ($allTopics->isEmpty()) {
+                return $this->renderEmptyState($request, $sort);
+            }
+
+            // hotの場合のみ各コミュニティから1つの代表投稿を選択、それ以外は全投稿表示
+            if ($sort === 'hot') {
+                $representativeTopics = collect();
+                $topicsByCommunityCached = $allTopics->groupBy('community_id');
+                
+                foreach ($topicsByCommunityCached as $communityId => $communityTopics) {
+                    // 各コミュニティから最もスコアの高い投稿を代表として選択
+                    $representativeTopic = $communityTopics->sortByDesc('score')->first();
+                    if ($representativeTopic) {
+                        $representativeTopics->push($representativeTopic);
+                    }
+                }
+                $topics = $representativeTopics;
+            } else {
+                // new, top, risingの場合は全投稿を表示
+                $topics = $allTopics;
+            }
+
+            // 全ての投稿の実際のコメント数を効率的に取得
+            $allTopicIds = $allTopics->pluck('id');
+            $commentsCount = Comment::whereIn('topic_id', $allTopicIds)
+                ->selectRaw('topic_id, COUNT(*) as comments_count')
+                ->groupBy('topic_id')
+                ->pluck('comments_count', 'topic_id');
+
+            // フロントエンド用に全ての投稿データを準備（矢印切り替え用）
+            $allTopicsFormatted = $allTopics->map(function ($topic) use ($commentsCount) {
+                return $this->formatTopicForFrontend($topic, $commentsCount);
+            });
+
+            // 代表投稿のフロントエンド用のデータ形式に変換
+            $posts = $topics->map(function ($topic) use ($commentsCount) {
+                return $this->formatTopicForFrontend($topic, $commentsCount);
+            });
+
+            // サイドバー用のデータ（データベースから取得）
+            $trending_communities = Community::orderBy('members_count', 'desc')
+                ->take(5)
+                ->get()
+                ->map(function ($community) {
+                    return [
+                        'name' => $community->name,
+                        'members' => $community->getMembersFormatted(),
+                        'icon' => $community->icon,
+                        'description' => $community->description
+                    ];
+                });
+
+            $popular_posts_today = Topic::with('community')
+                ->where('created_at', '>=', now()->startOfDay())
+                ->whereNotNull('community_id')
+                ->orderBy('score', 'desc')
+                ->take(3)
+                ->get()
+                ->map(function ($topic) {
+                    return [
+                        'id' => $topic->id,
+                        'title' => $topic->title,
+                        'subreddit' => $topic->community->name ?? 'Unknown',
+                        'score' => $topic->score
+                    ];
+                });
+
+            return Inertia::render('home/index', [
+                'posts' => $posts->values(),
+                'all_topics' => $allTopicsFormatted->values(),
+                'current_sort' => $sort,
+                'trending_communities' => $trending_communities,
+                'popular_posts_today' => $popular_posts_today,
+                'user' => $request->user()
+            ]);
+
+        } catch (\Exception $e) {
+            // エラーログを出力してフォールバック表示
+            \Log::error('HomeController index error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return $this->renderEmptyState($request, $request->get('sort', 'hot'));
         }
+    }
 
-        // 全ての投稿の実際のコメント数を効率的に取得
-        $allTopicIds = $allTopics->pluck('id');
-        $commentsCount = Comment::whereIn('topic_id', $allTopicIds)
-            ->selectRaw('topic_id, COUNT(*) as comments_count')
-            ->groupBy('topic_id')
-            ->pluck('comments_count', 'topic_id');
-
-        // フロントエンド用に全ての投稿データを準備（矢印切り替え用）
-        $allTopicsFormatted = $allTopics->map(function ($topic) use ($commentsCount) {
-            return [
-                'id' => $topic->id,
-                'subreddit' => $topic->community->name,
-                'subreddit_icon' => $topic->community->icon,
-                'subreddit_slug' => $topic->community->slug,
-                'title' => $topic->title,
-                'content' => $topic->content,
-                'type' => $topic->type,
-                'author' => [
-                    'username' => $topic->user->name,
-                    'karma' => rand(1000, 5000), // 仮のカルマ値
-                    'cake_day' => $topic->user->created_at->format('Y-m-d')
-                ],
-                'votes' => [
-                    'upvotes' => $topic->upvotes,
-                    'downvotes' => $topic->downvotes,
-                    'score' => $topic->score
-                ],
-                'comments_count' => $commentsCount[$topic->id] ?? 0,
-                'awards' => $topic->awards ?? [],
-                'created_at' => $topic->created_at,
-                'url' => $topic->url,
-                'image_url' => $topic->image_url,
-                'is_nsfw' => $topic->is_nsfw,
-                'is_spoiler' => $topic->is_spoiler,
-                'flair' => $topic->flair
-            ];
-        });
-
-        // 代表投稿のフロントエンド用のデータ形式に変換
-        $posts = $topics->map(function ($topic) use ($commentsCount) {
-            return [
-                'id' => $topic->id,
-                'subreddit' => $topic->community->name,
-                'subreddit_icon' => $topic->community->icon,
-                'subreddit_slug' => $topic->community->slug,
-                'title' => $topic->title,
-                'content' => $topic->content,
-                'type' => $topic->type,
-                'author' => [
-                    'username' => $topic->user->name,
-                    'karma' => rand(1000, 5000), // 仮のカルマ値
-                    'cake_day' => $topic->user->created_at->format('Y-m-d')
-                ],
-                'votes' => [
-                    'upvotes' => $topic->upvotes,
-                    'downvotes' => $topic->downvotes,
-                    'score' => $topic->score
-                ],
-                'comments_count' => $commentsCount[$topic->id] ?? 0,
-                'awards' => $topic->awards ?? [],
-                'created_at' => $topic->created_at,
-                'url' => $topic->url,
-                'image_url' => $topic->image_url,
-                'is_nsfw' => $topic->is_nsfw,
-                'is_spoiler' => $topic->is_spoiler,
-                'flair' => $topic->flair
-            ];
-        });
-
-        // サイドバー用のデータ（データベースから取得）
-        $trending_communities = Community::orderBy('members_count', 'desc')
-            ->take(5)
-            ->get()
-            ->map(function ($community) {
-                return [
-                    'name' => $community->name,
-                    'members' => $community->getMembersFormatted(),
-                    'icon' => $community->icon,
-                    'description' => $community->description
-                ];
-            });
-
-        $popular_posts_today = Topic::with('community')
-            ->where('created_at', '>=', now()->startOfDay())
-            ->whereNotNull('community_id')
-            ->orderBy('score', 'desc')
-            ->take(3)
-            ->get()
-            ->map(function ($topic) {
-                return [
-                    'id' => $topic->id,
-                    'title' => $topic->title,
-                    'subreddit' => $topic->community->name,
-                    'score' => $topic->score
-                ];
-            });
-
+    /**
+     * データが存在しない場合の空の状態を表示
+     */
+    private function renderEmptyState(Request $request, string $sort)
+    {
         return Inertia::render('home/index', [
-            'posts' => $posts->values(),
-            'all_topics' => $allTopicsFormatted->values(),
+            'posts' => [],
+            'all_topics' => [],
             'current_sort' => $sort,
-            'trending_communities' => $trending_communities,
-            'popular_posts_today' => $popular_posts_today,
+            'trending_communities' => [],
+            'popular_posts_today' => [],
             'user' => $request->user()
         ]);
+    }
+
+    /**
+     * TopicをフロントエンドFormatに変換
+     */
+    private function formatTopicForFrontend($topic, $commentsCount)
+    {
+        return [
+            'id' => $topic->id,
+            'subreddit' => $topic->community->name ?? 'Unknown',
+            'subreddit_icon' => $topic->community->icon ?? '📝',
+            'subreddit_slug' => $topic->community->slug ?? 'unknown',
+            'title' => $topic->title,
+            'content' => $topic->content,
+            'type' => $topic->type ?? 'text',
+            'author' => [
+                'username' => $topic->user->name ?? 'Anonymous',
+                'karma' => rand(1000, 5000), // 仮のカルマ値
+                'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
+            ],
+            'votes' => [
+                'upvotes' => $topic->upvotes ?? 0,
+                'downvotes' => $topic->downvotes ?? 0,
+                'score' => $topic->score ?? 0
+            ],
+            'comments_count' => $commentsCount[$topic->id] ?? 0,
+            'awards' => $topic->awards ?? [],
+            'created_at' => $topic->created_at,
+            'url' => $topic->url,
+            'image_url' => $topic->image_url,
+            'is_nsfw' => $topic->is_nsfw ?? false,
+            'is_spoiler' => $topic->is_spoiler ?? false,
+            'flair' => $topic->flair
+        ];
     }
 
     public function show(Request $request, $id)
