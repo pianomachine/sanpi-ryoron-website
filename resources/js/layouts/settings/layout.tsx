@@ -13,6 +13,16 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
+        title: 'My Topics',
+        href: '/settings/my-topics',
+        icon: null,
+    },
+    {
+        title: 'Saved Topics',
+        href: '/settings/saved-topics',
+        icon: null,
+    },
+    {
         title: 'Appearance',
         href: '/settings/appearance',
         icon: null,

@@ -13,11 +13,20 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // テストユーザーを作成
+        User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Test User']
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // 追加のユーザーを作成（投票用）
+        User::factory(100)->create();
+
+        // 議題とコメントのサンプルデータを生成
+        $this->call([
+            CommunitySeeder::class,
+            TopicSeeder::class,
+            CommentSeeder::class,
         ]);
     }
 }
