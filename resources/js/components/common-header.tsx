@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
+import { type User } from '@/types';
 import { getLoginUrlWithRedirect, getLogoutData } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -18,7 +19,7 @@ import {
     TrendingUp,
     Search,
     Plus,
-    User,
+    User as UserIcon,
     Edit,
     Trophy,
     Crown,
@@ -30,7 +31,7 @@ import {
 } from 'lucide-react';
 
 interface CommonHeaderProps {
-    user?: any;
+    user?: User | null;
 }
 
 export default function CommonHeader({ user }: CommonHeaderProps) {
@@ -139,7 +140,7 @@ export default function CommonHeader({ user }: CommonHeaderProps) {
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem asChild>
                                         <Link href="/settings/my-topics" className="flex items-center w-full">
-                                            <User className="mr-2 h-4 w-4" />
+                                            <UserIcon className="mr-2 h-4 w-4" />
                                             <span>プロフィールを見る</span>
                                         </Link>
                                     </DropdownMenuItem>

@@ -1,5 +1,6 @@
+import React, { useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { type User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -65,7 +66,7 @@ interface HomePageProps {
     current_sort: string;
     trending_communities: Community[];
     popular_posts_today: PopularPost[];
-    user?: any;
+    user?: User | null;
 }
 
 export default function RedditHome({ 

@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { type User } from '@/types';
 import CommonHeader from '@/components/common-header';
 import { 
     ArrowUp, 
@@ -14,7 +15,7 @@ import {
     Users,
     Eye,
     Calendar,
-    User,
+    User as UserIcon,
     Settings,
     Bell,
     Plus,
@@ -58,7 +59,7 @@ interface CommunityShowProps {
     community: Community;
     posts: Post[];
     current_sort: string;
-    user?: any;
+    user?: User | null;
 }
 
 export default function CommunityShow({ community, posts, current_sort, user }: CommunityShowProps) {
@@ -238,7 +239,7 @@ export default function CommunityShow({ community, posts, current_sort, user }: 
                                 <CardContent className="p-4">
                                     <div className="flex items-center space-x-3">
                                         <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                                            <User className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                                            <UserIcon className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                                         </div>
                                         <input 
                                             type="text" 
@@ -450,7 +451,7 @@ export default function CommunityShow({ community, posts, current_sort, user }: 
                                 <CardContent className="space-y-2">
                                     {community.moderators.map((mod, index) => (
                                         <div key={index} className="flex items-center space-x-2 text-xs">
-                                            <User className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+                                            <UserIcon className="w-3 h-3 text-gray-400 dark:text-gray-500" />
                                             <span className="text-blue-600 dark:text-blue-400">{mod}</span>
                                             <Star className="w-3 h-3 text-yellow-500" />
                                         </div>

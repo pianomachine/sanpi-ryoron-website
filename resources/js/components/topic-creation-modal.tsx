@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
+import { type User } from '@/types';
 import {
     Dialog,
     DialogContent,
@@ -19,7 +20,7 @@ import { X, Loader2, Plus, Check, Search, ChevronDown } from 'lucide-react';
 interface TopicCreationModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    user?: any;
+    user?: User | null;
 }
 
 interface Community {
@@ -127,7 +128,7 @@ export default function TopicCreationModal({ open, onOpenChange, user }: TopicCr
         if (open && communities.length === 0) {
             fetchCommunities();
         }
-    }, [open]);
+    }, [open, communities.length]);
 
     // コミュニティ選択時の処理
     const handleCommunitySelect = (communityId: string) => {

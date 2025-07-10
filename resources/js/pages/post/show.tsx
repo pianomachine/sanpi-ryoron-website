@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { type User } from '@/types';
 import CommonHeader from '@/components/common-header';
 import { 
     ArrowUp, 
@@ -12,7 +13,7 @@ import {
     Award, 
     Bookmark, 
     MoreHorizontal,
-    User,
+    User as UserIcon,
     ChevronDown,
     ChevronUp,
     Flag,
@@ -113,7 +114,7 @@ interface PostShowProps {
     current_user_vote?: 'support' | 'oppose' | null;
     isSaved?: boolean;
     related_topics: RelatedTopic[];
-    user?: any;
+    user?: User | null;
 }
 
 export default function PostShow({ post, comments, community, voting_results, current_user_vote, isSaved: initialIsSaved = false, related_topics, user }: PostShowProps) {
@@ -261,7 +262,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                     showNotification('保存に失敗しました', 'error');
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Save toggle failed:', error);
             showNotification(
                 isSaved ? '保存解除に失敗しました' : '保存に失敗しました',
@@ -1113,7 +1114,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                 <CardContent className="space-y-2">
                                     {community.moderators.map((mod, index) => (
                                         <div key={index} className="flex items-center space-x-2 text-xs">
-                                            <User className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+                                            <UserIcon className="w-3 h-3 text-gray-400 dark:text-gray-500" />
                                             <span className="text-blue-600 dark:text-blue-400">{mod}</span>
                                         </div>
                                     ))}

@@ -1,6 +1,7 @@
 import SanpiRyoronNavbar from '@/components/sanpi-ryoron-navbar';
 import { usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
+import { type User } from '@/types';
 
 interface NavbarLayoutProps {
     children: ReactNode;
@@ -8,12 +9,9 @@ interface NavbarLayoutProps {
 
 interface PageProps {
     auth: {
-        user: {
-            name: string;
-            email: string;
-        } | null;
+        user: User | null;
     };
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export default function NavbarLayout({ children }: NavbarLayoutProps) {
