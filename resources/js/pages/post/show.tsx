@@ -677,9 +677,49 @@ export default function PostShow({ post, comments, community, voting_results, cu
                         {/* Main Post */}
                         <div className="lg:col-span-3">
                             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-4 overflow-hidden p-0">
+                                {/* Mobile navigation - Show on small screens */}
+                                <div className="sm:hidden bg-gray-100 dark:bg-gray-700 p-3 border-b border-gray-200 dark:border-gray-600">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`p-1.5 h-auto text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
+                                                    related_topics.length === 0 ? 'cursor-not-allowed opacity-30' : ''
+                                                } ${isTransitioning ? 'cursor-not-allowed' : ''}`}
+                                                onClick={() => handleTopicNavigation('up')}
+                                                disabled={related_topics.length === 0 || isTransitioning}
+                                                title={related_topics.length > 0 ? `前の議題: ${related_topics[currentTopicIndex > 0 ? currentTopicIndex - 1 : related_topics.length - 1]?.title.slice(0, 30)}...` : '他の議題がありません'}
+                                            >
+                                                <ArrowUp className="w-5 h-5" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`p-1.5 h-auto text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
+                                                    related_topics.length === 0 ? 'cursor-not-allowed opacity-30' : ''
+                                                } ${isTransitioning ? 'cursor-not-allowed' : ''}`}
+                                                onClick={() => handleTopicNavigation('down')}
+                                                disabled={related_topics.length === 0 || isTransitioning}
+                                                title={related_topics.length > 0 ? `次の議題: ${related_topics[currentTopicIndex < related_topics.length - 1 ? currentTopicIndex + 1 : 0]?.title.slice(0, 30)}...` : '他の議題がありません'}
+                                            >
+                                                <ArrowDown className="w-5 h-5" />
+                                            </Button>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                {related_topics.length > 0 ? `${currentTopicIndex + 1}/${related_topics.length + 1}` : '1/1'}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                {community.name}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="flex">
-                                    {/* Topic Navigation Section */}
-                                    <div className={`flex flex-col items-center justify-center px-3 bg-gray-200 dark:bg-gray-700 min-w-[60px] flex-shrink-0 transition-opacity duration-150 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
+                                    {/* Desktop Topic Navigation Section - Hidden on mobile */}
+                                    <div className={`hidden sm:flex flex-col items-center justify-center px-3 bg-gray-200 dark:bg-gray-700 min-w-[60px] flex-shrink-0 transition-opacity duration-150 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -715,17 +755,17 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                     </div>
 
                                     {/* Post Content */}
-                                    <div className="flex-1 p-4">
+                                    <div className="flex-1 p-3 sm:p-4">
                                         {/* Post Header */}
-                                        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-3">
                                             <span className="font-medium text-gray-900 dark:text-white">{post.subreddit}</span>
-                                            <span>•</span>
-                                            <span>投稿者: {post.author.username}</span>
-                                            <span>•</span>
-                                            <span>{formatTimeAgo(post.created_at)}</span>
+                                            <span className="hidden sm:inline">•</span>
+                                            <span className="text-xs sm:text-sm">投稿者: {post.author.username}</span>
+                                            <span className="hidden sm:inline">•</span>
+                                            <span className="text-xs sm:text-sm">{formatTimeAgo(post.created_at)}</span>
                                             {post.flair && (
                                                 <>
-                                                    <span>•</span>
+                                                    <span className="hidden sm:inline">•</span>
                                                     <Badge variant="outline" className="text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">
                                                         {post.flair}
                                                     </Badge>
@@ -733,8 +773,8 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                             )}
                                             {post.gilded > 0 && (
                                                 <>
-                                                    <span>•</span>
-                                                    <span className="text-yellow-600 dark:text-yellow-400">🏆 {post.gilded}</span>
+                                                    <span className="hidden sm:inline">•</span>
+                                                    <span className="text-yellow-600 dark:text-yellow-400 text-xs sm:text-sm">🏆 {post.gilded}</span>
                                                 </>
                                             )}
                                         </div>
@@ -844,10 +884,10 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                         )}
 
                                         {/* Post Actions */}
-                                        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                                             <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 <MessageSquare className="w-4 h-4" />
-                                                <span>{post.comments_count} コメント</span>
+                                                <span className="text-xs sm:text-sm">{post.comments_count} コメント</span>
                                             </Button>
                                             <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" title="シェア">
                                                 <Share className="w-4 h-4" />
@@ -865,7 +905,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                                     } ${savingState !== 'idle' ? 'animate-pulse' : ''}`}
                                                 >
                                                     <Bookmark className={`w-4 h-4 transition-all duration-200 ${isSaved ? 'fill-current scale-110' : ''} ${savingState !== 'idle' ? 'animate-bounce' : ''}`} />
-                                                    <span className="font-medium">
+                                                    <span className="font-medium text-xs sm:text-sm">
                                                         {savingState === 'saving' ? '保存中...' : 
                                                          savingState === 'unsaving' ? '解除中...' : 
                                                          isSaved ? '保存済み' : '保存'}
@@ -874,7 +914,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                             )}
                                             <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 <Award className="w-4 h-4" />
-                                                <span>評価</span>
+                                                <span className="hidden sm:inline text-xs sm:text-sm">評価</span>
                                             </Button>
                                             <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 <MoreHorizontal className="w-4 h-4" />
