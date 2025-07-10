@@ -673,9 +673,9 @@ export default function PostShow({ post, comments, community, voting_results, cu
                         </Link>
                     </div>
                     
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
                         {/* Main Post */}
-                        <div className="lg:col-span-3">
+                        <div className="lg:col-span-3 order-1">
                             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-4 overflow-hidden p-0">
                                 {/* Mobile navigation - Show on small screens */}
                                 <div className="sm:hidden bg-gray-100 dark:bg-gray-700 p-3 border-b border-gray-200 dark:border-gray-600">
@@ -817,21 +817,21 @@ export default function PostShow({ post, comments, community, voting_results, cu
 
                                         {/* Voting Section */}
                                         {showVotePrompt && (
-                                            <div className="bg-gradient-to-r from-blue-50 to-red-50 dark:from-blue-900/20 dark:to-red-900/20 p-4 rounded-lg mb-4 border border-gray-200 dark:border-gray-700">
-                                                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+                                            <div className="bg-gradient-to-r from-blue-50 to-red-50 dark:from-blue-900/20 dark:to-red-900/20 p-3 sm:p-4 rounded-lg mb-4 border border-gray-200 dark:border-gray-700">
+                                                <h3 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 mb-3 leading-tight">
                                                     この議題についてあなたの意見を聞かせてください
                                                 </h3>
-                                                <div className="flex space-x-3">
+                                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                                                     <Button 
                                                         onClick={() => handleTopicVote('support')}
-                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm py-2"
                                                         size="sm"
                                                     >
                                                         👍 賛成
                                                     </Button>
                                                     <Button 
                                                         onClick={() => handleTopicVote('oppose')}
-                                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm py-2"
                                                         size="sm"
                                                     >
                                                         👎 反対
@@ -974,12 +974,13 @@ export default function PostShow({ post, comments, community, voting_results, cu
                             {/* Comment Sort - Only show if user has voted */}
                             {topicVote && (
                                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 p-3">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">並び替え:</span>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">並び替え:</span>
                                         <Button 
                                             variant={commentSort === 'best' ? 'default' : 'ghost'} 
                                             size="sm"
                                             onClick={() => setCommentSort('best')}
+                                            className="text-xs sm:text-sm"
                                         >
                                             ベスト
                                         </Button>
@@ -987,6 +988,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                             variant={commentSort === 'top' ? 'default' : 'ghost'} 
                                             size="sm"
                                             onClick={() => setCommentSort('top')}
+                                            className="text-xs sm:text-sm"
                                         >
                                             人気順
                                         </Button>
@@ -994,6 +996,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                             variant={commentSort === 'new' ? 'default' : 'ghost'} 
                                             size="sm"
                                             onClick={() => setCommentSort('new')}
+                                            className="text-xs sm:text-sm"
                                         >
                                             新着順
                                         </Button>
@@ -1001,6 +1004,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                             variant={commentSort === 'controversial' ? 'default' : 'ghost'} 
                                             size="sm"
                                             onClick={() => setCommentSort('controversial')}
+                                            className="text-xs sm:text-sm hidden sm:inline-flex"
                                         >
                                             議論の的
                                         </Button>
@@ -1046,7 +1050,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                         </div>
 
                         {/* Sidebar */}
-                        <div className="space-y-4">
+                        <div className="space-y-4 order-2">
                             {/* Community Info */}
                             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                                 <CardHeader className="pb-3">
