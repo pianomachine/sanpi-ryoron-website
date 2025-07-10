@@ -9,8 +9,13 @@ use Laravel\WorkOS\Http\Middleware\ValidateSessionWithWorkOS;
 
 // メインアプリ - トップページを/homeにリダイレクト
 Route::get('/', function () {
-    return redirect('/home');
+    return redirect('/welcome');
 });
+
+// Welcomeページ
+Route::get('/welcome', function () {
+    return Inertia::render('welcome');
+})->name('welcome');
 
 // メインアプリのルート
 Route::get('/home', [HomeController::class, 'index'])->name('home');
