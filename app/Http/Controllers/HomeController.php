@@ -20,7 +20,7 @@ class HomeController extends Controller
             
             // トピックの取得
             $query = Topic::with(['user', 'community'])
-                ->where('status', 'active')
+                ->where('status', '=', 'active')
                 ->whereNotNull('community_id');
 
             switch ($sort) {
@@ -67,7 +67,12 @@ class HomeController extends Controller
                                 WHERE comments.topic_id = topics.id
                             )
                         ) as popularity_score'))
+                        ->where('status', '=', 'active')
+                        ->where('community_id', '!=', null)
                         ->orderBy('popularity_score', 'desc');
+
+                        \Log::info('Hot sort query: ' . $query->toSql());
+                        \Log::info('Hot sort bindings: ' . json_encode($query->getBindings()));
                     } catch (\Exception $e) {
                         \Log::error('HomeController error: ' . $e->getMessage());
                         $query->orderBy('created_at', 'desc');
@@ -86,15 +91,24 @@ class HomeController extends Controller
             }
 
             $allTopics = $query->limit(20)->get();
+            \Log::info('Topics found: ' . $allTopics->count());
             
             // データが存在しない場合は空の状態を表示
             if ($allTopics->isEmpty()) {
+                \Log::warning('No topics found');
                 return $this->renderEmptyState($request, $sort);
             }
             
             // データ変換処理（プレミアムプロモーション無し）
             $posts = $allTopics->map(function ($topic) {
-                return $this->formatTopicForApi($topic);
+                $formattedTopic = $this->formatTopicForApi($topic);
+                \Log::info('Formatted topic: ' . json_encode([
+                    'id' => $topic->id,
+                    'title' => $topic->title,
+                    'community' => $topic->community ? $topic->community->name : 'Unknown',
+                    'popularity_score' => $topic->popularity_score
+                ]));
+                return $formattedTopic;
             });
             
             // サイドバーデータの取得
@@ -112,14 +126,17 @@ class HomeController extends Controller
                 \Log::error('Error getting sidebar data: ' . $e->getMessage());
             }
             
-            return Inertia::render('home/index', [
+            $response = [
                 'posts' => $posts->values(),
                 'all_topics' => $posts->values(),
                 'current_sort' => $sort,
                 'trending_communities' => $trending_communities,
                 'popular_posts_today' => $popular_posts_today,
                 'user' => $request->user()
-            ]);
+            ];
+            \Log::info('Response data structure: ' . json_encode(array_keys($response)));
+            
+            return Inertia::render('home/index', $response);
 
         } catch (\Exception $e) {
             \Log::error('HomeController error: ' . $e->getMessage());
@@ -841,8 +858,8 @@ class HomeController extends Controller
             
             $supportVotes = $authSupportVotes + $anonSupportVotes;
             $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
-            
-            return [
+
+            $formatted = [
                 'id' => $topic->id,
                 'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
                 'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
@@ -870,37 +887,21 @@ class HomeController extends Controller
                 'flair' => $topic->flair ?? '',
                 'popularity_score' => $topic->popularity_score ?? 0
             ];
+
+            \Log::info('Formatted topic data: ' . json_encode([
+                'id' => $topic->id,
+                'title' => $topic->title,
+                'votes' => [
+                    'support' => $supportVotes,
+                    'oppose' => $opposeVotes
+                ],
+                'comments' => $commentsCount
+            ]));
+
+            return $formatted;
         } catch (\Exception $e) {
             \Log::error('Error in formatTopicForApi: ' . $e->getMessage());
-            // フォールバック: 最小限のデータを返す
-            return [
-                'id' => $topic->id ?? 0,
-                'subreddit' => 'Unknown',
-                'subreddit_icon' => '📝',
-                'subreddit_slug' => 'unknown',
-                'title' => $topic->title ?? 'No Title',
-                'content' => '',
-                'type' => 'text',
-                'author' => [
-                    'username' => 'Anonymous',
-                    'karma' => 1000,
-                    'cake_day' => date('Y-m-d')
-                ],
-                'votes' => [
-                    'upvotes' => 0,
-                    'downvotes' => 0,
-                    'score' => 0
-                ],
-                'comments_count' => 0,
-                'awards' => [],
-                'created_at' => $topic->created_at ?? now(),
-                'url' => '',
-                'image_url' => '',
-                'is_nsfw' => false,
-                'is_spoiler' => false,
-                'flair' => '',
-                'popularity_score' => 0
-            ];
+            return null;
         }
     }
 }
