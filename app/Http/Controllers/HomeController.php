@@ -698,7 +698,8 @@ class HomeController extends Controller
                         ) as popularity_score'))
                         ->where('status', 'active')
                         ->where('community_id', '!=', null)
-                        ->orderBy('popularity_score', 'desc');
+                        ->orderBy('popularity_score', 'desc')
+                        ->orderBy('topics.id', 'desc'); // 同スコア時の安定ソート
                     } catch (\Exception $e) {
                         \Log::error('HomeController error: ' . $e->getMessage());
                         $query->orderBy('created_at', 'desc');
@@ -791,7 +792,8 @@ class HomeController extends Controller
                             WHERE comments.topic_id = topics.id
                         )
                     ) as popularity_score'))
-                    ->orderBy('popularity_score', 'desc');
+                    ->orderBy('popularity_score', 'desc')
+                    ->orderBy('topics.id', 'desc');
                     break;
             }
 
