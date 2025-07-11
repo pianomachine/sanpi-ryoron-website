@@ -16,110 +16,150 @@ class HomeController extends Controller
     public function index(Request $request)
     {
         try {
-            $sort = $request->get('sort', 'hot'); // hot, new, top, rising
-
-            // データベースから投稿を取得（コミュニティが設定されているもののみ）
-            $query = Topic::with(['user', 'community'])
-                ->where('status', 'active')
-                ->whereNotNull('community_id');
-
-            // ソート
-            switch ($sort) {
-                case 'new':
-                    $query->orderBy('created_at', 'desc');
-                    break;
-                case 'top':
-                    $query->orderBy('score', 'desc');
-                    break;
-                case 'rising':
-                    $query->where('created_at', '>=', now()->subHours(24))
-                          ->orderBy('score', 'desc');
-                    break;
-                case 'hot':
-                default:
-                    // PostgreSQL対応: JULIANDAY関数をEXTRACT(EPOCH)に変更
-                    if (config('database.default') === 'pgsql') {
-                        $query->orderByRaw('(score + comments_count * 0.5) / (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM created_at) + 86400) DESC');
-                    } else {
-                        // SQLite用
-                        $query->orderByRaw('(score + comments_count * 0.5) / (JULIANDAY("now") - JULIANDAY(created_at) + 1) DESC');
-                    }
-                    break;
-            }
-
-            $allTopics = $query->get();
-
-            // データが存在しない場合のフォールバック
-            if ($allTopics->isEmpty()) {
+            // デバッグ用：段階的にチェック
+            \Log::info('HomeController index started');
+            
+            $sort = $request->get('sort', 'hot');
+            \Log::info('Sort parameter: ' . $sort);
+            
+            // データベース接続テスト
+            try {
+                $topicCount = Topic::count();
+                \Log::info('Topics count: ' . $topicCount);
+            } catch (\Exception $e) {
+                \Log::error('Error counting topics: ' . $e->getMessage());
+                // テーブルが存在しない場合のフォールバック
                 return $this->renderEmptyState($request, $sort);
             }
-
-            // hotの場合のみ各コミュニティから1つの代表投稿を選択、それ以外は全投稿表示
-            if ($sort === 'hot') {
-                $representativeTopics = collect();
-                $topicsByCommunityCached = $allTopics->groupBy('community_id');
-                
-                foreach ($topicsByCommunityCached as $communityId => $communityTopics) {
-                    // 各コミュニティから最もスコアの高い投稿を代表として選択
-                    $representativeTopic = $communityTopics->sortByDesc('score')->first();
-                    if ($representativeTopic) {
-                        $representativeTopics->push($representativeTopic);
-                    }
-                }
-                $topics = $representativeTopics;
-            } else {
-                // new, top, risingの場合は全投稿を表示
-                $topics = $allTopics;
+            
+            // コミュニティテーブルのチェック
+            try {
+                $communityCount = Community::count();
+                \Log::info('Communities count: ' . $communityCount);
+            } catch (\Exception $e) {
+                \Log::error('Error counting communities: ' . $e->getMessage());
+                return $this->renderEmptyState($request, $sort);
             }
+            
+            // 基本的なクエリをまず試す
+            try {
+                $basicTopics = Topic::where('status', 'active')->limit(10)->get();
+                \Log::info('Basic topics query successful, found: ' . $basicTopics->count());
+            } catch (\Exception $e) {
+                \Log::error('Error in basic topics query: ' . $e->getMessage());
+                return $this->renderEmptyState($request, $sort);
+            }
+            
+            // リレーションシップを含むクエリ
+            try {
+                $topicsWithRelations = Topic::with(['user', 'community'])
+                    ->where('status', 'active')
+                    ->whereNotNull('community_id')
+                    ->limit(5)
+                    ->get();
+                \Log::info('Topics with relations query successful, found: ' . $topicsWithRelations->count());
+                
+                // データが存在しない場合
+                if ($topicsWithRelations->isEmpty()) {
+                    \Log::info('No topics found, rendering empty state');
+                    return $this->renderEmptyState($request, $sort);
+                }
+                
+            } catch (\Exception $e) {
+                \Log::error('Error in topics with relations query: ' . $e->getMessage());
+                return $this->renderEmptyState($request, $sort);
+            }
+            
+            // ソート処理（簡略化）
+            try {
+                $query = Topic::with(['user', 'community'])
+                    ->where('status', 'active')
+                    ->whereNotNull('community_id');
 
-            // 全ての投稿の実際のコメント数を効率的に取得
-            $allTopicIds = $allTopics->pluck('id');
-            $commentsCount = Comment::whereIn('topic_id', $allTopicIds)
-                ->selectRaw('topic_id, COUNT(*) as comments_count')
-                ->groupBy('topic_id')
-                ->pluck('comments_count', 'topic_id');
+                switch ($sort) {
+                    case 'new':
+                        $query->orderBy('created_at', 'desc');
+                        break;
+                    case 'top':
+                        $query->orderBy('score', 'desc');
+                        break;
+                    default:
+                        $query->orderBy('created_at', 'desc'); // hotの代わりに簡単なソート
+                        break;
+                }
 
-            // フロントエンド用に全ての投稿データを準備（矢印切り替え用）
-            $allTopicsFormatted = $allTopics->map(function ($topic) use ($commentsCount) {
-                return $this->formatTopicForFrontend($topic, $commentsCount);
-            });
-
-            // 代表投稿のフロントエンド用のデータ形式に変換
-            $posts = $topics->map(function ($topic) use ($commentsCount) {
-                return $this->formatTopicForFrontend($topic, $commentsCount);
-            });
-
-            // サイドバー用のデータ（データベースから取得）
-            $trending_communities = Community::orderBy('members_count', 'desc')
-                ->take(5)
-                ->get()
-                ->map(function ($community) {
-                    return [
-                        'name' => $community->name,
-                        'members' => $community->getMembersFormatted(),
-                        'icon' => $community->icon,
-                        'description' => $community->description
-                    ];
-                });
-
-            $popular_posts_today = Topic::with('community')
-                ->where('created_at', '>=', now()->startOfDay())
-                ->whereNotNull('community_id')
-                ->orderBy('score', 'desc')
-                ->take(3)
-                ->get()
-                ->map(function ($topic) {
+                $allTopics = $query->limit(20)->get();
+                \Log::info('Final query successful, found: ' . $allTopics->count());
+                
+            } catch (\Exception $e) {
+                \Log::error('Error in final query: ' . $e->getMessage());
+                return $this->renderEmptyState($request, $sort);
+            }
+            
+            // データ変換処理
+            try {
+                $posts = $allTopics->map(function ($topic) {
                     return [
                         'id' => $topic->id,
+                        'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
+                        'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
+                        'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
                         'title' => $topic->title,
-                        'subreddit' => $topic->community->name ?? 'Unknown',
-                        'score' => $topic->score
+                        'content' => $topic->content ?? '',
+                        'type' => $topic->type ?? 'text',
+                        'author' => [
+                            'username' => $topic->user ? $topic->user->name : 'Anonymous',
+                            'karma' => 1000,
+                            'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
+                        ],
+                        'votes' => [
+                            'upvotes' => $topic->upvotes ?? 0,
+                            'downvotes' => $topic->downvotes ?? 0,
+                            'score' => $topic->score ?? 0
+                        ],
+                        'comments_count' => $topic->comments_count ?? 0,
+                        'awards' => [],
+                        'created_at' => $topic->created_at,
+                        'url' => $topic->url,
+                        'image_url' => $topic->image_url,
+                        'is_nsfw' => $topic->is_nsfw ?? false,
+                        'is_spoiler' => $topic->is_spoiler ?? false,
+                        'flair' => $topic->flair
                     ];
                 });
+                \Log::info('Data transformation successful');
+                
+            } catch (\Exception $e) {
+                \Log::error('Error in data transformation: ' . $e->getMessage());
+                return $this->renderEmptyState($request, $sort);
+            }
+            
+            // 簡単なサイドバーデータ
+            $trending_communities = [];
+            $popular_posts_today = [];
+            
+            try {
+                $trending_communities = Community::orderBy('members_count', 'desc')
+                    ->take(5)
+                    ->get()
+                    ->map(function ($community) {
+                        return [
+                            'name' => $community->name,
+                            'members' => $community->getMembersFormatted(),
+                            'icon' => $community->icon,
+                            'description' => $community->description
+                        ];
+                    });
+                \Log::info('Trending communities successful');
+            } catch (\Exception $e) {
+                \Log::error('Error getting trending communities: ' . $e->getMessage());
+            }
 
+            \Log::info('HomeController index completed successfully');
+            
             return Inertia::render('home/index', [
                 'posts' => $posts->values(),
-                'all_topics' => $allTopicsFormatted->values(),
+                'all_topics' => $posts->values(), // 簡略化のため同じデータを使用
                 'current_sort' => $sort,
                 'trending_communities' => $trending_communities,
                 'popular_posts_today' => $popular_posts_today,
@@ -127,9 +167,10 @@ class HomeController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            // エラーログを出力してフォールバック表示
-            \Log::error('HomeController index error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+            \Log::error('HomeController general error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
             
             return $this->renderEmptyState($request, $request->get('sort', 'hot'));
