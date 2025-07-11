@@ -64,3 +64,55 @@ Route::middleware([
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
+
+// 管理者用シーダー実行ルート（本番環境でのサンプルデータ作成用）
+Route::get('/admin/seed', function () {
+    if (config('app.env') === 'production') {
+        // 本番環境では簡単な認証チェック
+        $expectedPassword = env('ADMIN_SEED_PASSWORD', 'sanpi-ryoron-2024');
+        $providedPassword = request('password');
+        
+        if ($providedPassword !== $expectedPassword) {
+            return response('認証が必要です。パスワードを確認してください。', 401);
+        }
+    }
+    
+    try {
+        // シーダー実行
+        \Artisan::call('db:seed');
+        $output = \Artisan::output();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'シーダーの実行が完了しました！',
+            'output' => $output,
+            'timestamp' => now()->toDateTimeString()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error', 
+            'message' => 'シーダーの実行中にエラーが発生しました：' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString()
+        ], 500);
+    }
+});
+
+Route::get('/admin/seed-status', function () {
+    try {
+        $topicCount = \App\Models\Topic::count();
+        $communityCount = \App\Models\Community::count();
+        $userCount = \App\Models\User::count();
+        
+        return response()->json([
+            'topics' => $topicCount,
+            'communities' => $communityCount, 
+            'users' => $userCount,
+            'has_sample_data' => $topicCount > 0 && $communityCount > 0,
+            'timestamp' => now()->toDateTimeString()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
