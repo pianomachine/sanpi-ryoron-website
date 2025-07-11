@@ -54,6 +54,7 @@ interface Community {
     members: string;
     icon: string;
     description: string;
+    slug: string;
 }
 
 interface PopularPost {
@@ -80,6 +81,9 @@ export default function RedditHome({
     popular_posts_today,
     user 
 }: HomePageProps) {
+    // デバッグ用：trending_communitiesの内容を確認
+    console.log('trending_communities:', trending_communities);
+    
     // 無限スクロールフック
     const { 
         data: infinitePosts, 
@@ -239,18 +243,10 @@ export default function RedditHome({
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     {trending_communities.slice(0, 5).map((community, index) => {
-                                        // コミュニティ名からスラッグを生成
-                                        const communitySlugMap: Record<string, string> = {
-                                            '💰 デート代支払い': 'dating-payment',
-                                            '🚃 女性専用車両': 'women-only-cars',
-                                            '🏥 子ども温泉': 'children-spa',
-                                            '🍝 レディースデー': 'ladies-day',
-                                            '📱 電車内マナー': 'train-manner'
-                                        };
-                                        const slug = communitySlugMap[community.name];
-                                        
+                                        // slugが存在しない場合のフォールバック処理
+                                        const communitySlug = community.slug || 'unknown';
                                         return (
-                                            <Link key={community.name} href={`/community/${slug}`} className="block">
+                                            <Link key={community.name} href={`/community/${communitySlug}`} className="block">
                                                 <div className="flex items-center space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded cursor-pointer">
                                                     <span className="text-xs text-gray-500 dark:text-gray-400 w-4">{index + 1}</span>
                                                     <span className="text-lg">{community.icon}</span>
