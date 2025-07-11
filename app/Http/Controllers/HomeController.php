@@ -42,34 +42,33 @@ class HomeController extends Controller
                         }
 
                         // PostgreSQL対応のホットソート - サブクエリを1つにまとめる
-                        $query->addSelect(\DB::raw('(
-                            COALESCE(topics.score, 0) + 
-                            (
-                                SELECT COALESCE(COUNT(*), 0)
-                                FROM topic_votes
-                                WHERE topic_votes.topic_id = topics.id
-                                AND topic_votes.stance = \'support\'
-                            ) +
-                            (
-                                SELECT COALESCE(COUNT(*), 0)
-                                FROM anonymous_votes
-                                WHERE anonymous_votes.topic_id = topics.id
-                                AND anonymous_votes.stance = \'support\'
-                            ) +
-                            (
-                                SELECT COALESCE(COUNT(*), 0)
-                                FROM comments
-                                WHERE comments.topic_id = topics.id
-                            ) +
-                            (
-                                SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
-                                FROM comments
-                                WHERE comments.topic_id = topics.id
-                            )
-                        ) as popularity_score'))
-                        ->where('status', '=', 'active')
-                        ->where('community_id', '!=', null)
-                        ->orderBy('popularity_score', 'desc');
+                        $query->select('topics.*')
+                            ->addSelect(\DB::raw('(
+                                COALESCE(topics.score, 0) + 
+                                (
+                                    SELECT COALESCE(COUNT(*), 0)
+                                    FROM topic_votes
+                                    WHERE topic_votes.topic_id = topics.id
+                                    AND topic_votes.stance = \'support\'
+                                ) +
+                                (
+                                    SELECT COALESCE(COUNT(*), 0)
+                                    FROM anonymous_votes
+                                    WHERE anonymous_votes.topic_id = topics.id
+                                    AND anonymous_votes.stance = \'support\'
+                                ) +
+                                (
+                                    SELECT COALESCE(COUNT(*), 0)
+                                    FROM comments
+                                    WHERE comments.topic_id = topics.id
+                                ) +
+                                (
+                                    SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
+                                    FROM comments
+                                    WHERE comments.topic_id = topics.id
+                                )
+                            ) as popularity_score'))
+                            ->orderBy('popularity_score', 'desc');
 
                         \Log::info('Hot sort query: ' . $query->toSql());
                         \Log::info('Hot sort bindings: ' . json_encode($query->getBindings()));
@@ -92,6 +91,7 @@ class HomeController extends Controller
 
             $allTopics = $query->limit(20)->get();
             \Log::info('Topics found: ' . $allTopics->count());
+            \Log::info('First topic data: ' . json_encode($allTopics->first()));
             
             // データが存在しない場合は空の状態を表示
             if ($allTopics->isEmpty()) {
@@ -109,7 +109,7 @@ class HomeController extends Controller
                     'popularity_score' => $topic->popularity_score
                 ]));
                 return $formattedTopic;
-            });
+            })->filter();  // nullを除外
             
             // サイドバーデータの取得
             $trending_communities = [];
