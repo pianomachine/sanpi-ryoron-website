@@ -353,7 +353,13 @@ class HomeController extends Controller
                 break;
             case 'hot':
             default:
-                $query->orderByRaw('(score + comments_count * 0.5) / (JULIANDAY("now") - JULIANDAY(created_at) + 1) DESC');
+                // PostgreSQL対応のホットソート
+                if (config('database.default') === 'pgsql') {
+                    $query->orderByRaw('(score + comments_count * 0.5) / (EXTRACT(EPOCH FROM (now() - created_at)) / 3600 + 1) DESC');
+                } else {
+                    // SQLite用
+                    $query->orderByRaw('(score + comments_count * 0.5) / (JULIANDAY("now") - JULIANDAY(created_at) + 1) DESC');
+                }
                 break;
         }
 
