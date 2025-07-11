@@ -65,6 +65,15 @@ Route::middleware([
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 
+// デプロイ確認用テストルート
+Route::get('/test-deploy', function () {
+    return response()->json([
+        'status' => 'deployed',
+        'timestamp' => now()->toDateTimeString(),
+        'version' => 'v2024-01-20'
+    ]);
+});
+
 // 管理者用シーダー実行ルート（本番環境でのサンプルデータ作成用）
 Route::get('/admin/seed', function () {
     if (config('app.env') === 'production') {
