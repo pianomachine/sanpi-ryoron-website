@@ -508,26 +508,31 @@ class HomeController extends Controller
             $since = now()->subDays(7);
 
             return \App\Models\Community::select('communities.*')
-                ->selectSub(
-                    function($query) use ($since) {
-                        $query->selectRaw('COUNT(*)')
-                            ->from('topics')
-                            ->whereColumn('topics.community_id', 'communities.id')
-                            ->where('topics.created_at', '>=', $since);
-                    },
-                    'recent_topics_count'
-                )
-                ->selectSub(
-                    function($query) use ($since) {
-                        $query->selectRaw('COUNT(*)')
-                            ->from('comments')
-                            ->join('topics', 'topics.id', '=', 'comments.topic_id')
-                            ->whereColumn('topics.community_id', 'communities.id')
-                            ->where('comments.created_at', '>=', $since);
-                    },
-                    'recent_comments_count'
-                )
-                ->havingRaw('recent_topics_count > 0 OR recent_comments_count > 0')
+                ->addSelect(\DB::raw('(
+                    SELECT COALESCE(COUNT(*), 0)
+                    FROM topics
+                    WHERE topics.community_id = communities.id
+                    AND topics.created_at >= \'' . $since->toDateTimeString() . '\'
+                ) as recent_topics_count'))
+                ->addSelect(\DB::raw('(
+                    SELECT COALESCE(COUNT(*), 0)
+                    FROM comments
+                    INNER JOIN topics ON topics.id = comments.topic_id
+                    WHERE topics.community_id = communities.id
+                    AND comments.created_at >= \'' . $since->toDateTimeString() . '\'
+                ) as recent_comments_count'))
+                ->whereRaw('(
+                    SELECT COUNT(*)
+                    FROM topics
+                    WHERE topics.community_id = communities.id
+                    AND topics.created_at >= \'' . $since->toDateTimeString() . '\'
+                ) > 0 OR (
+                    SELECT COUNT(*)
+                    FROM comments
+                    INNER JOIN topics ON topics.id = comments.topic_id
+                    WHERE topics.community_id = communities.id
+                    AND comments.created_at >= \'' . $since->toDateTimeString() . '\'
+                ) > 0')
                 ->orderByDesc('recent_topics_count')
                 ->orderByDesc('recent_comments_count')
                 ->limit(5)
@@ -646,33 +651,7 @@ class HomeController extends Controller
             
             // トピックの取得
             $query = Topic::with(['user', 'community'])
-                ->select('topics.*')
-                ->selectSub(
-                    function($query) {
-                        $query->selectRaw('COUNT(*)')
-                            ->from('topic_votes')
-                            ->whereColumn('topic_votes.topic_id', 'topics.id');
-                    },
-                    'total_votes'
-                )
-                ->selectSub(
-                    function($query) {
-                        $query->selectRaw('COUNT(*)')
-                            ->from('comments')
-                            ->whereColumn('comments.topic_id', 'topics.id');
-                    },
-                    'total_comments'
-                )
-                ->selectSub(
-                    function($query) {
-                        $query->selectRaw('COUNT(DISTINCT user_id)')
-                            ->from('comments')
-                            ->whereColumn('comments.topic_id', 'topics.id');
-                    },
-                    'unique_commenters'
-                )
-                ->where('status', 'active')
-                ->where('community_id', '!=', null);
+                ->select('topics.*');
 
             // ソート方法の適用
             switch ($sort) {
@@ -692,47 +671,47 @@ class HomeController extends Controller
                         }
 
                         // PostgreSQL対応のホットソート
-                        $query->selectSub(
-                            function($query) {
-                                $query->selectRaw('COUNT(*)')
-                                    ->from('topic_votes')
-                                    ->whereColumn('topic_votes.topic_id', 'topics.id')
-                                    ->where('stance', 'support');
-                            },
-                            'auth_support_votes'
-                        )
-                        ->selectSub(
-                            function($query) {
-                                $query->selectRaw('COUNT(*)')
-                                    ->from('anonymous_votes')
-                                    ->whereColumn('anonymous_votes.topic_id', 'topics.id')
-                                    ->where('stance', 'support');
-                            },
-                            'anon_support_votes'
-                        )
-                        ->selectSub(
-                            function($query) {
-                                $query->selectRaw('COUNT(*)')
-                                    ->from('comments')
-                                    ->whereColumn('comments.topic_id', 'topics.id');
-                            },
-                            'comment_count'
-                        )
-                        ->selectSub(
-                            function($query) {
-                                $query->selectRaw('COUNT(DISTINCT user_id)')
-                                    ->from('comments')
-                                    ->whereColumn('comments.topic_id', 'topics.id');
-                            },
-                            'unique_commenter_count'
-                        )
-                        ->selectRaw('
+                        $query->addSelect(\DB::raw('(
+                            SELECT COALESCE(COUNT(*), 0)
+                            FROM topic_votes
+                            WHERE topic_votes.topic_id = topics.id
+                            AND topic_votes.stance = \'support\'
+                        ) as auth_support_count'))
+                        ->addSelect(\DB::raw('(
+                            SELECT COALESCE(COUNT(*), 0)
+                            FROM anonymous_votes
+                            WHERE anonymous_votes.topic_id = topics.id
+                            AND anonymous_votes.stance = \'support\'
+                        ) as anon_support_count'))
+                        ->addSelect(\DB::raw('(
+                            SELECT COALESCE(COUNT(*), 0)
+                            FROM comments
+                            WHERE comments.topic_id = topics.id
+                        ) as comment_count'))
+                        ->addSelect(\DB::raw('(
+                            SELECT COALESCE(COUNT(DISTINCT user_id), 0)
+                            FROM comments
+                            WHERE comments.topic_id = topics.id
+                        ) as unique_commenter_count'))
+                        ->addSelect(\DB::raw('(
                             COALESCE(topics.score, 0) + 
-                            COALESCE(auth_support_votes, 0) + 
-                            COALESCE(anon_support_votes, 0) + 
-                            COALESCE(comment_count, 0) + 
-                            (COALESCE(unique_commenter_count, 0) * 3) as popularity_score
-                        ')
+                            (SELECT COALESCE(COUNT(*), 0)
+                             FROM topic_votes
+                             WHERE topic_votes.topic_id = topics.id
+                             AND topic_votes.stance = \'support\') +
+                            (SELECT COALESCE(COUNT(*), 0)
+                             FROM anonymous_votes
+                             WHERE anonymous_votes.topic_id = topics.id
+                             AND anonymous_votes.stance = \'support\') +
+                            (SELECT COALESCE(COUNT(*), 0)
+                             FROM comments
+                             WHERE comments.topic_id = topics.id) +
+                            ((SELECT COALESCE(COUNT(DISTINCT user_id), 0)
+                              FROM comments
+                              WHERE comments.topic_id = topics.id) * 3)
+                        ) as popularity_score'))
+                        ->where('status', 'active')
+                        ->where('community_id', '!=', null)
                         ->orderBy('popularity_score', 'desc');
                     } catch (\Exception $e) {
                         \Log::error('HomeController error: ' . $e->getMessage());
