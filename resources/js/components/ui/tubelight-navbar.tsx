@@ -1,6 +1,8 @@
+"use client"
+
 import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import Link from "next/link"
+import { Link } from "@inertiajs/react"
 import { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
