@@ -74,6 +74,83 @@ Route::get('/test-deploy', function () {
     ]);
 });
 
+// サイドバーデータのデバッグ用ルート
+Route::get('/debug/sidebar-data', function () {
+    try {
+        // 基本データ確認
+        $topicCount = \App\Models\Topic::count();
+        $communityCount = \App\Models\Community::count();
+        $commentCount = \App\Models\Comment::count();
+        $voteCount = \App\Models\TopicVote::count();
+        $anonVoteCount = \App\Models\AnonymousVote::count();
+        
+        // 今日の投稿確認
+        $todayStart = now()->startOfDay();
+        $todayTopics = \App\Models\Topic::where('created_at', '>=', $todayStart)
+            ->where('status', 'active')
+            ->with(['community', 'user'])
+            ->get();
+        
+        // 過去7日間の活動確認
+        $sevenDaysAgo = now()->subDays(7);
+        $recentActivity = \App\Models\Topic::where('created_at', '>=', $sevenDaysAgo)
+            ->where('status', 'active')
+            ->count();
+        
+        // コミュニティの活動度確認
+        $communities = \App\Models\Community::all()->map(function($community) use ($sevenDaysAgo) {
+            $recentTopics = \App\Models\Topic::where('community_id', $community->id)
+                ->where('created_at', '>=', $sevenDaysAgo)
+                ->where('status', 'active')
+                ->count();
+                
+            return [
+                'id' => $community->id,
+                'name' => $community->name,
+                'members_count' => $community->members_count,
+                'recent_topics' => $recentTopics
+            ];
+        });
+        
+        return response()->json([
+            'database_counts' => [
+                'topics' => $topicCount,
+                'communities' => $communityCount,
+                'comments' => $commentCount,
+                'auth_votes' => $voteCount,
+                'anonymous_votes' => $anonVoteCount
+            ],
+            'today_info' => [
+                'today_start' => $todayStart->toDateTimeString(),
+                'current_time' => now()->toDateTimeString(),
+                'topics_today' => $todayTopics->count(),
+                'today_topics_list' => $todayTopics->map(function($topic) {
+                    return [
+                        'id' => $topic->id,
+                        'title' => $topic->title,
+                        'created_at' => $topic->created_at->toDateTimeString(),
+                        'score' => $topic->score,
+                        'community' => $topic->community ? $topic->community->name : null
+                    ];
+                })
+            ],
+            'recent_activity' => [
+                'seven_days_ago' => $sevenDaysAgo->toDateTimeString(),
+                'topics_last_7_days' => $recentActivity
+            ],
+            'communities_activity' => $communities,
+            'timezone' => config('app.timezone'),
+            'db_connection' => config('database.default')
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
 // 管理者用シーダー実行ルート（本番環境でのサンプルデータ作成用）
 Route::get('/admin/seed', function () {
     if (config('app.env') === 'production') {

@@ -476,49 +476,87 @@ class HomeController extends Controller
      */
     private function getTrendingCommunities()
     {
-        // 過去7日間の活動度を考慮したコミュニティランキング
-        $sevenDaysAgo = now()->subDays(7);
-        
-        return Community::select('communities.*')
-            ->selectSub(function ($query) use ($sevenDaysAgo) {
-                $query->selectRaw('COUNT(*)')
-                    ->from('topics')
-                    ->whereColumn('topics.community_id', 'communities.id')
-                    ->where('topics.created_at', '>=', $sevenDaysAgo)
-                    ->where('topics.status', 'active');
-            }, 'recent_topics_count')
-            ->selectSub(function ($query) use ($sevenDaysAgo) {
-                $query->selectRaw('COUNT(*)')
-                    ->from('comments')
-                    ->join('topics', 'comments.topic_id', '=', 'topics.id')
-                    ->whereColumn('topics.community_id', 'communities.id')
-                    ->where('comments.created_at', '>=', $sevenDaysAgo);
-            }, 'recent_comments_count')
-            ->selectSub(function ($query) use ($sevenDaysAgo) {
-                $query->selectRaw('COUNT(*)')
-                    ->from('topic_votes')
-                    ->join('topics', 'topic_votes.topic_id', '=', 'topics.id')
-                    ->whereColumn('topics.community_id', 'communities.id')
-                    ->where('topic_votes.created_at', '>=', $sevenDaysAgo);
-            }, 'recent_votes_count')
-            ->selectRaw('(members_count * 0.3 + COALESCE(recent_topics_count, 0) * 5 + COALESCE(recent_comments_count, 0) * 2 + COALESCE(recent_votes_count, 0) * 1) as activity_score')
-            ->orderBy('activity_score', 'desc')
-            ->take(5)
-            ->get()
-            ->map(function ($community) {
+        try {
+            $sevenDaysAgo = now()->subDays(7);
+            
+            // シンプルなクエリでコミュニティを取得し、PHPで計算
+            $communities = Community::all();
+            
+            $communityScores = $communities->map(function ($community) use ($sevenDaysAgo) {
+                // 過去7日間の議題数
+                $recentTopics = Topic::where('community_id', $community->id)
+                    ->where('created_at', '>=', $sevenDaysAgo)
+                    ->where('status', 'active')
+                    ->count();
+                
+                // 過去7日間のコメント数
+                $recentComments = Comment::whereHas('topic', function ($query) use ($community, $sevenDaysAgo) {
+                    $query->where('community_id', $community->id)
+                        ->where('comments.created_at', '>=', $sevenDaysAgo);
+                })->count();
+                
+                // 過去7日間の投票数
+                $recentVotes = \App\Models\TopicVote::whereHas('topic', function ($query) use ($community, $sevenDaysAgo) {
+                    $query->where('community_id', $community->id)
+                        ->where('topic_votes.created_at', '>=', $sevenDaysAgo);
+                })->count();
+                
+                // 活動度スコア計算
+                $activityScore = ($community->members_count * 0.3) + 
+                               ($recentTopics * 5) + 
+                               ($recentComments * 2) + 
+                               ($recentVotes * 1);
+                
                 return [
-                    'name' => $community->name,
-                    'members' => $community->getMembersFormatted(),
-                    'icon' => $community->icon,
-                    'description' => $community->description,
-                    'slug' => $community->slug,
+                    'community' => $community,
+                    'activity_score' => $activityScore,
                     'recent_activity' => [
-                        'topics' => $community->recent_topics_count ?? 0,
-                        'comments' => $community->recent_comments_count ?? 0,
-                        'votes' => $community->recent_votes_count ?? 0
+                        'topics' => $recentTopics,
+                        'comments' => $recentComments,
+                        'votes' => $recentVotes
                     ]
                 ];
             });
+            
+            // スコア順でソートして上位5件を取得
+            return $communityScores
+                ->sortByDesc('activity_score')
+                ->take(5)
+                ->map(function ($item) {
+                    $community = $item['community'];
+                    return [
+                        'name' => $community->name,
+                        'members' => $community->getMembersFormatted(),
+                        'icon' => $community->icon,
+                        'description' => $community->description,
+                        'slug' => $community->slug,
+                        'recent_activity' => $item['recent_activity']
+                    ];
+                })
+                ->values();
+                
+        } catch (\Exception $e) {
+            \Log::error('Error in getTrendingCommunities: ' . $e->getMessage());
+            
+            // エラー時は基本的なランキングを返す
+            return Community::orderBy('members_count', 'desc')
+                ->take(5)
+                ->get()
+                ->map(function ($community) {
+                    return [
+                        'name' => $community->name,
+                        'members' => $community->getMembersFormatted(),
+                        'icon' => $community->icon,
+                        'description' => $community->description,
+                        'slug' => $community->slug,
+                        'recent_activity' => [
+                            'topics' => 0,
+                            'comments' => 0,
+                            'votes' => 0
+                        ]
+                    ];
+                });
+        }
     }
 
     /**
@@ -526,17 +564,23 @@ class HomeController extends Controller
      */
     private function getPopularPostsToday()
     {
-        // 今日の00:00から現在まで
-        $todayStart = now()->startOfDay();
-        
-        return Topic::with(['community', 'user'])
-            ->where('created_at', '>=', $todayStart)
-            ->where('status', 'active')
-            ->selectRaw('topics.*, (score + comments_count * 2) as popularity_score')
-            ->orderBy('popularity_score', 'desc')
-            ->take(5)
-            ->get()
-            ->map(function ($topic) {
+        try {
+            // 今日の投稿をまず確認
+            $todayStart = now()->startOfDay();
+            $todayTopics = Topic::where('created_at', '>=', $todayStart)
+                ->where('status', 'active')
+                ->count();
+            
+            // 今日の投稿がない場合は過去3日間に拡張
+            $searchStart = $todayTopics > 0 ? $todayStart : now()->subDays(3);
+            
+            $topics = Topic::with(['community', 'user'])
+                ->where('created_at', '>=', $searchStart)
+                ->where('status', 'active')
+                ->get();
+            
+            // PHPで人気度を計算
+            $topicsWithScore = $topics->map(function ($topic) {
                 // 実際のコメント数を取得
                 $actualCommentsCount = Comment::where('topic_id', $topic->id)->count();
                 
@@ -545,20 +589,45 @@ class HomeController extends Controller
                 $anonVotes = AnonymousVote::where('topic_id', $topic->id)->count();
                 $totalVotes = $authVotes + $anonVotes;
                 
+                // 人気度スコア計算
+                $popularityScore = ($topic->score ?? 0) + ($actualCommentsCount * 2) + ($totalVotes * 1);
+                
                 return [
-                    'id' => $topic->id,
-                    'title' => $topic->title,
-                    'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
-                    'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
-                    'score' => $topic->score ?? 0,
-                    'comments_count' => $actualCommentsCount,
-                    'votes_count' => $totalVotes,
-                    'author' => [
-                        'username' => $topic->user ? $topic->user->name : 'Anonymous'
-                    ],
-                    'created_at' => $topic->created_at->format('H:i'),
-                    'popularity_score' => $topic->popularity_score
+                    'topic' => $topic,
+                    'actual_comments_count' => $actualCommentsCount,
+                    'total_votes' => $totalVotes,
+                    'popularity_score' => $popularityScore
                 ];
             });
+            
+            // 人気度順でソートして上位5件を返す
+            return $topicsWithScore
+                ->sortByDesc('popularity_score')
+                ->take(5)
+                ->map(function ($item) {
+                    $topic = $item['topic'];
+                    return [
+                        'id' => $topic->id,
+                        'title' => $topic->title,
+                        'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
+                        'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
+                        'score' => $topic->score ?? 0,
+                        'comments_count' => $item['actual_comments_count'],
+                        'votes_count' => $item['total_votes'],
+                        'author' => [
+                            'username' => $topic->user ? $topic->user->name : 'Anonymous'
+                        ],
+                        'created_at' => $topic->created_at->format('m/d H:i'),
+                        'popularity_score' => $item['popularity_score']
+                    ];
+                })
+                ->values();
+                
+        } catch (\Exception $e) {
+            \Log::error('Error in getPopularPostsToday: ' . $e->getMessage());
+            
+            // エラー時は空の配列を返す
+            return collect([]);
+        }
     }
 }
