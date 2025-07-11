@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { SkeletonLoader, LoadingSeparator } from '@/components/skeleton-loader';
-
+import SortSelector from '@/components/sort-selector';
 import CommonHeader from '@/components/common-header';
 import { 
     ArrowUp, 
@@ -232,7 +232,7 @@ export default function RedditHome({
             
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                 <CommonHeader user={user} />
-
+                
                 {/* Main Content */}
                 <div className="max-w-7xl mx-auto px-4 py-4">
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -270,46 +270,16 @@ export default function RedditHome({
                         {/* Main Feed */}
                         <div className="lg:col-span-2">
                             {/* Sort Options */}
-                            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 p-3">
-                                <div className="flex items-center justify-evenly">
-                                    <Link 
-                                        href="/home?sort=hot" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
-                                            current_sort === 'hot' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                    >
-                                        <Flame className="w-3 h-3 sm:w-4 sm:h-4" />
-                                        <span>🔥人気</span>
-                                    </Link>
-                                    <Link 
-                                        href="/home?sort=new" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
-                                            current_sort === 'new' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                    >
-                                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                        <span>🆕最新</span>
-                                    </Link>
-                                    <Link 
-                                        href="/home?sort=top" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
-                                            current_sort === 'top' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                    >
-                                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                                        <span>⭐殿堂</span>
-                                    </Link>
-                                    <Link 
-                                        href="/home?sort=rising" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
-                                            current_sort === 'rising' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                    >
-                                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                                        <span>📈上昇中</span>
-                                    </Link>
-                                </div>
-                            </div>
+                            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-4">
+                                <CardContent className="p-0">
+                                    <SortSelector
+                                        currentSort={current_sort}
+                                        onSortChange={(value) => {
+                                            window.location.href = `/home?sort=${value}`;
+                                        }}
+                                    />
+                                </CardContent>
+                            </Card>
 
                             {/* Posts */}
                             <div className="space-y-3">
@@ -481,7 +451,7 @@ export default function RedditHome({
                                                                             topicVotes[post.id] === 'support' 
                                                                                 ? 'bg-blue-600 text-white' 
                                                                                 : 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                                                                        }`}
+                                                                            }`}
                                                                         onClick={() => handleTopicVote(post.id, 'support')}
                                                                     >
                                                                         賛成
@@ -493,7 +463,7 @@ export default function RedditHome({
                                                                             topicVotes[post.id] === 'oppose' 
                                                                                 ? 'bg-red-600 text-white' 
                                                                                 : 'border-red-600 dark:border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                                                        }`}
+                                                                            }`}
                                                                         onClick={() => handleTopicVote(post.id, 'oppose')}
                                                                     >
                                                                         反対
@@ -508,7 +478,7 @@ export default function RedditHome({
                                     );
                                 })}
                                 
-                                {/* ローディング中の表示改良 */}
+                                {/* Loading states and messages */}
                                 {loading && hasMore && (
                                     <>
                                         <LoadingSeparator />
@@ -516,7 +486,6 @@ export default function RedditHome({
                                     </>
                                 )}
                                 
-                                {/* エラー時の表示 */}
                                 {error && (
                                     <div className="text-center py-8 text-red-500 dark:text-red-400">
                                         <p>エラーが発生しました: {error}</p>
@@ -524,7 +493,6 @@ export default function RedditHome({
                                     </div>
                                 )}
                                 
-                                {/* 完了時の表示 */}
                                 {!hasMore && postsWithAds.length > 0 && !loading && (
                                     <div className="text-center py-8">
                                         <div className="text-gray-500 dark:text-gray-400 mb-2">
@@ -536,7 +504,6 @@ export default function RedditHome({
                                     </div>
                                 )}
                                 
-                                {/* 初期ローディング中（投稿が0件の場合） */}
                                 {postsWithAds.length === 0 && loading && (
                                     <SkeletonLoader count={5} />
                                 )}
