@@ -42,93 +42,51 @@ class HomeController extends Controller
                         }
 
                         // PostgreSQL対応のホットソート
-                        if (config('database.default') === 'pgsql') {
-                            $query->select('topics.*')
-                                ->selectRaw('
-                                    COALESCE(
-                                        (
-                                            SELECT COUNT(*)
-                                            FROM topic_votes
-                                            WHERE topic_votes.topic_id = topics.id
-                                            AND topic_votes.stance = \'support\'
-                                        ), 0
-                                    ) as support_votes,
-                                    COALESCE(
-                                        (
-                                            SELECT COUNT(*)
-                                            FROM anonymous_votes
-                                            WHERE anonymous_votes.topic_id = topics.id
-                                            AND anonymous_votes.stance = \'support\'
-                                        ), 0
-                                    ) as anon_support_votes,
-                                    COALESCE(
-                                        (
-                                            SELECT COUNT(*)
-                                            FROM comments
-                                            WHERE comments.topic_id = topics.id
-                                        ), 0
-                                    ) as comment_count,
-                                    COALESCE(
-                                        (
-                                            SELECT COUNT(DISTINCT user_id)
-                                            FROM comments
-                                            WHERE comments.topic_id = topics.id
-                                        ), 0
-                                    ) as unique_commenter_count
-                                ')
-                                ->selectRaw('
-                                    COALESCE(topics.score, 0) +
-                                    COALESCE(support_votes, 0) +
-                                    COALESCE(anon_support_votes, 0) +
-                                    COALESCE(comment_count, 0) +
-                                    (COALESCE(unique_commenter_count, 0) * 3) as popularity_score
-                                ')
-                                ->orderBy('popularity_score', 'desc');
-                        } else {
-                            // SQLite用のクエリ（既存のまま）
-                            $query->withCount([
-                                'votes as total_votes',
-                                'comments as total_comments',
-                                'comments as unique_commenters' => function ($query) {
-                                    $query->distinct('user_id');
-                                }
-                            ])
+                        $query->select('topics.*')
+                            ->selectSub(
+                                function($query) {
+                                    $query->selectRaw('COUNT(*)')
+                                        ->from('topic_votes')
+                                        ->whereColumn('topic_votes.topic_id', 'topics.id')
+                                        ->where('stance', 'support');
+                                },
+                                'auth_support_votes'
+                            )
+                            ->selectSub(
+                                function($query) {
+                                    $query->selectRaw('COUNT(*)')
+                                        ->from('anonymous_votes')
+                                        ->whereColumn('anonymous_votes.topic_id', 'topics.id')
+                                        ->where('stance', 'support');
+                                },
+                                'anon_support_votes'
+                            )
+                            ->selectSub(
+                                function($query) {
+                                    $query->selectRaw('COUNT(*)')
+                                        ->from('comments')
+                                        ->whereColumn('comments.topic_id', 'topics.id');
+                                },
+                                'comment_count'
+                            )
+                            ->selectSub(
+                                function($query) {
+                                    $query->selectRaw('COUNT(DISTINCT user_id)')
+                                        ->from('comments')
+                                        ->whereColumn('comments.topic_id', 'topics.id');
+                                },
+                                'unique_commenter_count'
+                            )
                             ->selectRaw('
-                                topics.*,
-                                (
-                                    COALESCE(topics.score, 0) + 
-                                    (
-                                        COALESCE((
-                                            SELECT COUNT(*)
-                                            FROM topic_votes
-                                            WHERE topic_votes.topic_id = topics.id
-                                            AND topic_votes.stance = \'support\'
-                                        ), 0) +
-                                        COALESCE((
-                                            SELECT COUNT(*)
-                                            FROM anonymous_votes
-                                            WHERE anonymous_votes.topic_id = topics.id
-                                            AND anonymous_votes.stance = \'support\'
-                                        ), 0)
-                                    ) +
-                                    COALESCE((
-                                        SELECT COUNT(*)
-                                        FROM comments
-                                        WHERE comments.topic_id = topics.id
-                                    ), 0) +
-                                    (
-                                        COALESCE((
-                                            SELECT COUNT(DISTINCT user_id)
-                                            FROM comments
-                                            WHERE comments.topic_id = topics.id
-                                        ), 0) * 3
-                                    )
-                                ) as popularity_score
-                            ');
-                        }
+                                COALESCE(topics.score, 0) + 
+                                COALESCE(auth_support_votes, 0) + 
+                                COALESCE(anon_support_votes, 0) + 
+                                COALESCE(comment_count, 0) + 
+                                (COALESCE(unique_commenter_count, 0) * 3) as popularity_score
+                            ')
+                            ->orderBy('popularity_score', 'desc');
                     } catch (\Exception $e) {
-                        \Log::error('Error in hot sorting: ' . $e->getMessage());
-                        // エラー時は作成日時でソート
+                        \Log::error('HomeController error: ' . $e->getMessage());
                         $query->orderBy('created_at', 'desc');
                     }
                     break;
@@ -547,38 +505,33 @@ class HomeController extends Controller
                 return collect([]);
             }
 
-            // 最近のアクティビティを計算（過去7日間）
             $since = now()->subDays(7);
-            
-            // コミュニティごとのアクティビティスコアを計算
-            $communities = \App\Models\Community::withCount([
-                'topics as recent_topics_count' => function ($query) use ($since) {
-                    $query->where('created_at', '>=', $since);
-                },
-                'comments as recent_comments_count' => function ($query) use ($since) {
-                    $query->where('created_at', '>=', $since);
-                }
-            ])
-            ->having('recent_topics_count', '>', 0)
-            ->orHaving('recent_comments_count', '>', 0)
-            ->orderByDesc('recent_topics_count')
-            ->orderByDesc('recent_comments_count')
-            ->limit(5)
-            ->get();
 
-            return $communities->map(function ($community) {
-                return [
-                    'name' => $community->name,
-                    'members' => $community->members_count ?? 0,
-                    'icon' => $community->icon,
-                    'description' => $community->description,
-                    'slug' => $community->slug ?? 'unknown',
-                    'recent_activity' => [
-                        'topics' => $community->recent_topics_count,
-                        'comments' => $community->recent_comments_count
-                    ]
-                ];
-            });
+            return \App\Models\Community::select('communities.*')
+                ->selectSub(
+                    function($query) use ($since) {
+                        $query->selectRaw('COUNT(*)')
+                            ->from('topics')
+                            ->whereColumn('topics.community_id', 'communities.id')
+                            ->where('topics.created_at', '>=', $since);
+                    },
+                    'recent_topics_count'
+                )
+                ->selectSub(
+                    function($query) use ($since) {
+                        $query->selectRaw('COUNT(*)')
+                            ->from('comments')
+                            ->join('topics', 'topics.id', '=', 'comments.topic_id')
+                            ->whereColumn('topics.community_id', 'communities.id')
+                            ->where('comments.created_at', '>=', $since);
+                    },
+                    'recent_comments_count'
+                )
+                ->havingRaw('recent_topics_count > 0 OR recent_comments_count > 0')
+                ->orderByDesc('recent_topics_count')
+                ->orderByDesc('recent_comments_count')
+                ->limit(5)
+                ->get();
 
         } catch (\Exception $e) {
             \Log::error('Error in getTrendingCommunities: ' . $e->getMessage());
