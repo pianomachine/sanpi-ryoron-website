@@ -31,25 +31,42 @@ class HomeController extends Controller
                     $query->orderBy('score', 'desc');
                     break;
                 case 'hot':
-                    // 人気度計算：投票数 + コメント数 + ユニークコメント者数を考慮
-                    $query->withCount([
-                        'votes as total_votes',
-                        'comments as total_comments',
-                        'comments as unique_commenters' => function ($query) {
-                            $query->distinct('user_id');
+                    try {
+                        // テーブルの存在確認
+                        if (!\Schema::hasTable('topic_votes') || 
+                            !\Schema::hasTable('anonymous_votes') || 
+                            !\Schema::hasTable('comments')) {
+                            \Log::error('Required tables do not exist for hot sorting');
+                            $query->orderBy('created_at', 'desc');
+                            break;
                         }
-                    ])
-                    ->selectRaw('
-                        topics.*,
-                        (
-                            COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
-                            COALESCE(topics.score, 0)
-                        ) as popularity_score
-                    ')
-                    ->orderBy('popularity_score', 'desc');
+
+                        // 人気度計算：投票数 + コメント数 + ユニークコメント者数を考慮
+                        $query->withCount([
+                            'votes as total_votes',
+                            'comments as total_comments',
+                            'comments as unique_commenters' => function ($query) {
+                                $query->distinct('user_id');
+                            }
+                        ])
+                        ->selectRaw('
+                            topics.*,
+                            COALESCE(
+                                (
+                                    COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
+                                    COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
+                                    COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
+                                    COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
+                                    COALESCE(topics.score, 0)
+                                ), 0
+                            ) as popularity_score
+                        ')
+                        ->orderBy('popularity_score', 'desc');
+                    } catch (\Exception $e) {
+                        \Log::error('Error in hot sorting: ' . $e->getMessage());
+                        // エラー時は作成日時でソート
+                        $query->orderBy('created_at', 'desc');
+                    }
                     break;
                 case 'rising':
                     // 上昇中：最近24時間で人気が上昇している議題
@@ -458,85 +475,50 @@ class HomeController extends Controller
     private function getTrendingCommunities()
     {
         try {
-            $sevenDaysAgo = now()->subDays(7);
+            // テーブルの存在確認
+            if (!\Schema::hasTable('communities') || 
+                !\Schema::hasTable('topics') || 
+                !\Schema::hasTable('comments')) {
+                \Log::error('Required tables do not exist for trending communities');
+                return collect([]);
+            }
+
+            // 最近のアクティビティを計算（過去7日間）
+            $since = now()->subDays(7);
             
-            // シンプルなクエリでコミュニティを取得し、PHPで計算
-            $communities = Community::all();
-            
-            $communityScores = $communities->map(function ($community) use ($sevenDaysAgo) {
-                // 過去7日間の議題数
-                $recentTopics = Topic::where('community_id', $community->id)
-                    ->where('created_at', '>=', $sevenDaysAgo)
-                    ->where('status', 'active')
-                    ->count();
-                
-                // 過去7日間のコメント数
-                $recentComments = Comment::whereHas('topic', function ($query) use ($community, $sevenDaysAgo) {
-                    $query->where('community_id', $community->id)
-                        ->where('comments.created_at', '>=', $sevenDaysAgo);
-                })->count();
-                
-                // 過去7日間の投票数
-                $recentVotes = \App\Models\TopicVote::whereHas('topic', function ($query) use ($community, $sevenDaysAgo) {
-                    $query->where('community_id', $community->id)
-                        ->where('topic_votes.created_at', '>=', $sevenDaysAgo);
-                })->count();
-                
-                // 活動度スコア計算
-                $activityScore = ($community->members_count * 0.3) + 
-                               ($recentTopics * 5) + 
-                               ($recentComments * 2) + 
-                               ($recentVotes * 1);
-                
+            // コミュニティごとのアクティビティスコアを計算
+            $communities = \App\Models\Community::withCount([
+                'topics as recent_topics_count' => function ($query) use ($since) {
+                    $query->where('created_at', '>=', $since);
+                },
+                'comments as recent_comments_count' => function ($query) use ($since) {
+                    $query->where('created_at', '>=', $since);
+                }
+            ])
+            ->having('recent_topics_count', '>', 0)
+            ->orHaving('recent_comments_count', '>', 0)
+            ->orderByDesc('recent_topics_count')
+            ->orderByDesc('recent_comments_count')
+            ->limit(5)
+            ->get();
+
+            return $communities->map(function ($community) {
                 return [
-                    'community' => $community,
-                    'activity_score' => $activityScore,
+                    'name' => $community->name,
+                    'members' => $community->members_count ?? 0,
+                    'icon' => $community->icon,
+                    'description' => $community->description,
+                    'slug' => $community->slug ?? 'unknown',
                     'recent_activity' => [
-                        'topics' => $recentTopics,
-                        'comments' => $recentComments,
-                        'votes' => $recentVotes
+                        'topics' => $community->recent_topics_count,
+                        'comments' => $community->recent_comments_count
                     ]
                 ];
             });
-            
-            // スコア順でソートして上位5件を取得
-            return $communityScores
-                ->sortByDesc('activity_score')
-                ->take(5)
-                ->map(function ($item) {
-                    $community = $item['community'];
-                    return [
-                        'name' => $community->name,
-                        'members' => $community->getMembersFormatted(),
-                        'icon' => $community->icon,
-                        'description' => $community->description,
-                        'slug' => $community->slug ?? 'unknown',
-                        'recent_activity' => $item['recent_activity']
-                    ];
-                })
-                ->values();
-                
+
         } catch (\Exception $e) {
             \Log::error('Error in getTrendingCommunities: ' . $e->getMessage());
-            
-            // エラー時は基本的なランキングを返す
-            return Community::orderBy('members_count', 'desc')
-                ->take(5)
-                ->get()
-                ->map(function ($community) {
-                    return [
-                        'name' => $community->name,
-                        'members' => $community->getMembersFormatted(),
-                        'icon' => $community->icon,
-                        'description' => $community->description,
-                        'slug' => $community->slug ?? 'unknown',
-                        'recent_activity' => [
-                            'topics' => 0,
-                            'comments' => 0,
-                            'votes' => 0
-                        ]
-                    ];
-                });
+            return collect([]);
         }
     }
 
