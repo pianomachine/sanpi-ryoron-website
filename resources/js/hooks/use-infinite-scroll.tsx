@@ -28,7 +28,7 @@ export function useInfiniteScroll({
     url,
     initialData = [],
     params = {},
-    threshold = 200,
+    threshold = 100, // モバイル向けにしきい値を調整
     enabled = true
 }: InfiniteScrollOptions): InfiniteScrollReturn {
     const [data, setData] = useState<any[]>(initialData);
@@ -185,32 +185,63 @@ export function useInfiniteScroll({
         });
     }, []);
 
-    // スクロールイベントの処理
+    // スクロールイベントの処理を改善
     useEffect(() => {
         if (!enabled) return;
 
         let scrollTimeout: NodeJS.Timeout;
+        let lastScrollY = window.scrollY;
+        let lastScrollTime = Date.now();
 
         const handleScroll = () => {
             if (loading || !hasMore) return;
 
-            clearTimeout(scrollTimeout);
+            const now = Date.now();
+            const timeDiff = now - lastScrollTime;
 
-            scrollTimeout = setTimeout(() => {
-                const scrollingElement = document.scrollingElement || document.documentElement;
-                const { scrollTop, scrollHeight, clientHeight } = scrollingElement;
-                const newIsNearBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+            // スクロール速度が速い場合はチェックを延期
+            if (timeDiff < 50) {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(handleScroll, 50);
+                return;
+            }
+
+            lastScrollTime = now;
+
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            const scrollY = window.scrollY;
+            const scrollDiff = Math.abs(scrollY - lastScrollY);
+
+            // スクロール方向を考慮
+            const isScrollingDown = scrollY > lastScrollY;
+            lastScrollY = scrollY;
+
+            // 高速スクロール時は早めに次のコンテンツを読み込む
+            const dynamicThreshold = scrollDiff > 100 ? threshold * 2 : threshold;
+
+            // スクロールが下向きで、かつ一定以上のスクロールがある場合のみチェック
+            if (isScrollingDown && scrollDiff > 10) {
+                const newIsNearBottom = (scrollY + windowHeight) >= (documentHeight - dynamicThreshold);
 
                 if (newIsNearBottom && !isNearBottomRef.current) {
                     loadMore();
                 }
                 isNearBottomRef.current = newIsNearBottom;
-            }, 100);
+            }
         };
 
+        // パフォーマンス向上のためpassiveオプションを使用
         window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        // タッチデバイス用のスクロール検知を追加
+        window.addEventListener('touchmove', handleScroll, { passive: true });
+        window.addEventListener('touchend', handleScroll, { passive: true });
+
         return () => {
             window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('touchmove', handleScroll);
+            window.removeEventListener('touchend', handleScroll);
             clearTimeout(scrollTimeout);
         };
     }, [loadMore, loading, hasMore, threshold, enabled]);
