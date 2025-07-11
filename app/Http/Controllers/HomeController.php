@@ -670,45 +670,31 @@ class HomeController extends Controller
                             break;
                         }
 
-                        // PostgreSQL対応のホットソート
+                        // PostgreSQL対応のホットソート - サブクエリを1つにまとめる
                         $query->addSelect(\DB::raw('(
-                            SELECT COALESCE(COUNT(*), 0)
-                            FROM topic_votes
-                            WHERE topic_votes.topic_id = topics.id
-                            AND topic_votes.stance = \'support\'
-                        ) as auth_support_count'))
-                        ->addSelect(\DB::raw('(
-                            SELECT COALESCE(COUNT(*), 0)
-                            FROM anonymous_votes
-                            WHERE anonymous_votes.topic_id = topics.id
-                            AND anonymous_votes.stance = \'support\'
-                        ) as anon_support_count'))
-                        ->addSelect(\DB::raw('(
-                            SELECT COALESCE(COUNT(*), 0)
-                            FROM comments
-                            WHERE comments.topic_id = topics.id
-                        ) as comment_count'))
-                        ->addSelect(\DB::raw('(
-                            SELECT COALESCE(COUNT(DISTINCT user_id), 0)
-                            FROM comments
-                            WHERE comments.topic_id = topics.id
-                        ) as unique_commenter_count'))
-                        ->addSelect(\DB::raw('(
                             COALESCE(topics.score, 0) + 
-                            (SELECT COALESCE(COUNT(*), 0)
-                             FROM topic_votes
-                             WHERE topic_votes.topic_id = topics.id
-                             AND topic_votes.stance = \'support\') +
-                            (SELECT COALESCE(COUNT(*), 0)
-                             FROM anonymous_votes
-                             WHERE anonymous_votes.topic_id = topics.id
-                             AND anonymous_votes.stance = \'support\') +
-                            (SELECT COALESCE(COUNT(*), 0)
-                             FROM comments
-                             WHERE comments.topic_id = topics.id) +
-                            ((SELECT COALESCE(COUNT(DISTINCT user_id), 0)
-                              FROM comments
-                              WHERE comments.topic_id = topics.id) * 3)
+                            (
+                                SELECT COALESCE(COUNT(*), 0)
+                                FROM topic_votes
+                                WHERE topic_votes.topic_id = topics.id
+                                AND topic_votes.stance = \'support\'
+                            ) +
+                            (
+                                SELECT COALESCE(COUNT(*), 0)
+                                FROM anonymous_votes
+                                WHERE anonymous_votes.topic_id = topics.id
+                                AND anonymous_votes.stance = \'support\'
+                            ) +
+                            (
+                                SELECT COALESCE(COUNT(*), 0)
+                                FROM comments
+                                WHERE comments.topic_id = topics.id
+                            ) +
+                            (
+                                SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
+                                FROM comments
+                                WHERE comments.topic_id = topics.id
+                            )
                         ) as popularity_score'))
                         ->where('status', 'active')
                         ->where('community_id', '!=', null)
@@ -769,24 +755,32 @@ class HomeController extends Controller
                     break;
                 case 'hot':
                 default:
-                    // 人気度計算
-                    $query->withCount([
-                        'votes as total_votes',
-                        'comments as total_comments',
-                        'comments as unique_commenters' => function ($query) {
-                            $query->distinct('user_id');
-                        }
-                    ])
-                    ->selectRaw('
-                        topics.*,
+                    // 人気度計算 - PostgreSQL対応
+                    $query->addSelect(\DB::raw('(
+                        COALESCE(topics.score, 0) + 
                         (
-                            COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
-                            COALESCE(topics.score, 0)
-                        ) as popularity_score
-                    ')
+                            SELECT COALESCE(COUNT(*), 0)
+                            FROM topic_votes
+                            WHERE topic_votes.topic_id = topics.id
+                            AND topic_votes.stance = \'support\'
+                        ) +
+                        (
+                            SELECT COALESCE(COUNT(*), 0)
+                            FROM anonymous_votes
+                            WHERE anonymous_votes.topic_id = topics.id
+                            AND anonymous_votes.stance = \'support\'
+                        ) +
+                        (
+                            SELECT COALESCE(COUNT(*), 0)
+                            FROM comments
+                            WHERE comments.topic_id = topics.id
+                        ) +
+                        (
+                            SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
+                            FROM comments
+                            WHERE comments.topic_id = topics.id
+                        )
+                    ) as popularity_score'))
                     ->orderBy('popularity_score', 'desc');
                     break;
             }
