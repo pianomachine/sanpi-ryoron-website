@@ -42,36 +42,10 @@ class HomeController extends Controller
                         }
 
                         // PostgreSQL対応のホットソート - サブクエリを1つにまとめる
-                        $query->select('topics.*')
-                            ->addSelect(\DB::raw('(
-                                (
-                                    COALESCE(topics.score, 0) + 
-                                    (
-                                        SELECT COALESCE(COUNT(*), 0)
-                                        FROM topic_votes
-                                        WHERE topic_votes.topic_id = topics.id
-                                        AND topic_votes.stance = \'support\'
-                                    ) +
-                                    (
-                                        SELECT COALESCE(COUNT(*), 0)
-                                        FROM anonymous_votes
-                                        WHERE anonymous_votes.topic_id = topics.id
-                                        AND anonymous_votes.stance = \'support\'
-                                    ) +
-                                    (
-                                        SELECT COALESCE(COUNT(*), 0)
-                                        FROM comments
-                                        WHERE comments.topic_id = topics.id
-                                    ) +
-                                    (
-                                        SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
-                                        FROM comments
-                                        WHERE comments.topic_id = topics.id
-                                    )
-                                ) / POWER(((EXTRACT(EPOCH FROM (NOW() - topics.created_at)) / 3600) + 2), 1.5)
-                            ) as hot_score'))
-                            ->orderBy('hot_score', 'desc')
-                            ->orderBy('topics.id', 'desc');
+                        $query->where('status','active')
+                              ->whereNotNull('community_id')
+                              ->orderBy('hot_score','desc')
+                              ->orderBy('topics.id','desc');
 
                         \Log::info('Hot sort query: ' . $query->toSql());
                         \Log::info('Hot sort bindings: ' . json_encode($query->getBindings()));
@@ -674,37 +648,10 @@ class HomeController extends Controller
                         }
 
                         // PostgreSQL対応のホットソート - サブクエリを1つにまとめる
-                        $query->addSelect(\DB::raw('(
-                            (
-                                COALESCE(topics.score, 0) + 
-                                (
-                                    SELECT COALESCE(COUNT(*), 0)
-                                    FROM topic_votes
-                                    WHERE topic_votes.topic_id = topics.id
-                                    AND topic_votes.stance = \'support\'
-                                ) +
-                                (
-                                    SELECT COALESCE(COUNT(*), 0)
-                                    FROM anonymous_votes
-                                    WHERE anonymous_votes.topic_id = topics.id
-                                    AND anonymous_votes.stance = \'support\'
-                                ) +
-                                (
-                                    SELECT COALESCE(COUNT(*), 0)
-                                    FROM comments
-                                    WHERE comments.topic_id = topics.id
-                                ) +
-                                (
-                                    SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
-                                    FROM comments
-                                    WHERE comments.topic_id = topics.id
-                                )
-                            ) / POWER(((EXTRACT(EPOCH FROM (NOW() - topics.created_at)) / 3600) + 2), 1.5)
-                        ) as hot_score'))
-                        ->where('status', 'active')
-                        ->where('community_id', '!=', null)
-                        ->orderBy('hot_score', 'desc')
-                        ->orderBy('topics.id', 'desc');
+                        $query->where('status','active')
+                              ->where('community_id','!=',null)
+                              ->orderBy('hot_score','desc')
+                              ->orderBy('topics.id','desc');
                     } catch (\Exception $e) {
                         \Log::error('HomeController error: ' . $e->getMessage());
                         $query->orderBy('created_at', 'desc');
@@ -771,36 +718,8 @@ class HomeController extends Controller
                     break;
                 case 'hot':
                 default:
-                    // 人気度計算 - PostgreSQL対応
-                    $query->addSelect(\DB::raw('(
-                        (
-                            COALESCE(topics.score, 0) + 
-                            (
-                                SELECT COALESCE(COUNT(*), 0)
-                                FROM topic_votes
-                                WHERE topic_votes.topic_id = topics.id
-                                AND topic_votes.stance = \'support\'
-                            ) +
-                            (
-                                SELECT COALESCE(COUNT(*), 0)
-                                FROM anonymous_votes
-                                WHERE anonymous_votes.topic_id = topics.id
-                                AND anonymous_votes.stance = \'support\'
-                            ) +
-                            (
-                                SELECT COALESCE(COUNT(*), 0)
-                                FROM comments
-                                WHERE comments.topic_id = topics.id
-                            ) +
-                            (
-                                SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
-                                FROM comments
-                                WHERE comments.topic_id = topics.id
-                            )
-                        ) / POWER(((EXTRACT(EPOCH FROM (NOW() - topics.created_at)) / 3600) + 2), 1.5)
-                    ) as hot_score'))
-                    ->orderBy('hot_score', 'desc')
-                    ->orderBy('topics.id', 'desc');
+                    $query->orderBy('hot_score','desc')
+                          ->orderBy('topics.id','desc');
                     break;
             }
 
