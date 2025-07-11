@@ -235,41 +235,41 @@ export default function RedditHome({
                         <div className="lg:col-span-2">
                             {/* Sort Options */}
                             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 p-3">
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto scrollbar-hide">
                                     <Link 
                                         href="/home?sort=hot" 
-                                        className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
                                             current_sort === 'hot' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <Flame className="w-4 h-4" />
+                                        <Flame className="w-3 h-3 sm:w-4 sm:h-4" />
                                         <span>🔥人気</span>
                                     </Link>
                                     <Link 
                                         href="/home?sort=new" 
-                                        className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
                                             current_sort === 'new' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <Clock className="w-4 h-4" />
+                                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
                                         <span>🆕最新</span>
                                     </Link>
                                     <Link 
                                         href="/home?sort=top" 
-                                        className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
                                             current_sort === 'top' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <TrendingUp className="w-4 h-4" />
+                                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
                                         <span>⭐殿堂</span>
                                     </Link>
                                     <Link 
                                         href="/home?sort=rising" 
-                                        className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
                                             current_sort === 'rising' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <TrendingUp className="w-4 h-4" />
+                                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
                                         <span>📈上昇中</span>
                                     </Link>
                                 </div>

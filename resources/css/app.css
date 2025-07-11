@@ -211,6 +211,15 @@
 
 /* 賛否両論.com専用スタイル */
 @layer components {
+    /* スクロールバーを隠す */
+    .scrollbar-hide {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;  /* Chrome, Safari and Opera */
+    }
+
     /* テキストの行数制限 */
     .line-clamp-2 {
         display: -webkit-box;
