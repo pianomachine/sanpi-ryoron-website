@@ -584,18 +584,39 @@ class HomeController extends Controller
                 // 実際のコメント数を取得
                 $actualCommentsCount = Comment::where('topic_id', $topic->id)->count();
                 
+                // ユニークコメンター数を取得（同じ人が何回コメントしても1人としてカウント）
+                $uniqueCommenters = Comment::where('topic_id', $topic->id)
+                    ->distinct('user_id')
+                    ->count('user_id');
+                
                 // 実際の投票数を取得（認証済み + 匿名）
                 $authVotes = \App\Models\TopicVote::where('topic_id', $topic->id)->count();
                 $anonVotes = AnonymousVote::where('topic_id', $topic->id)->count();
                 $totalVotes = $authVotes + $anonVotes;
                 
-                // 人気度スコア計算
-                $popularityScore = ($topic->score ?? 0) + ($actualCommentsCount * 2) + ($totalVotes * 1);
+                // 賛成票のみを集計（認証済み + 匿名）
+                $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                    ->where('stance', 'support')
+                    ->count();
+                $anonSupportVotes = AnonymousVote::where('topic_id', $topic->id)
+                    ->where('stance', 'support')
+                    ->count();
+                $totalSupportVotes = $authSupportVotes + $anonSupportVotes;
+                
+                // 改良された人気度スコア計算
+                // ベーススコア + (コメント数 × 1) + (ユニークコメンター数 × 3) + (投票数 × 1)
+                // ユニークコメンター数により高い重みを付けることで、同じ人の連続コメントを防ぐ
+                $popularityScore = ($topic->score ?? 0) + 
+                                 ($actualCommentsCount * 1) + 
+                                 ($uniqueCommenters * 3) + 
+                                 ($totalVotes * 1);
                 
                 return [
                     'topic' => $topic,
                     'actual_comments_count' => $actualCommentsCount,
+                    'unique_commenters' => $uniqueCommenters,
                     'total_votes' => $totalVotes,
+                    'total_support_votes' => $totalSupportVotes,
                     'popularity_score' => $popularityScore
                 ];
             });
@@ -611,8 +632,9 @@ class HomeController extends Controller
                         'title' => $topic->title,
                         'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
                         'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
-                        'score' => $topic->score ?? 0,
+                        'score' => $item['total_support_votes'], // 実際の賛成票数を表示
                         'comments_count' => $item['actual_comments_count'],
+                        'unique_commenters' => $item['unique_commenters'],
                         'votes_count' => $item['total_votes'],
                         'author' => [
                             'username' => $topic->user ? $topic->user->name : 'Anonymous'
