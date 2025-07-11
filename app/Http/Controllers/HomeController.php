@@ -639,83 +639,122 @@ class HomeController extends Controller
     public function getPosts(Request $request)
     {
         try {
-            $sort = $request->get('sort', 'hot');
-            $page = (int) $request->get('page', 1);
+            $sort = $request->input('sort', 'hot');
+            $page = (int) $request->input('page', 1);
             $perPage = 20;
             $offset = ($page - 1) * $perPage;
             
             // トピックの取得
             $query = Topic::with(['user', 'community'])
+                ->select('topics.*')
+                ->selectSub(
+                    function($query) {
+                        $query->selectRaw('COUNT(*)')
+                            ->from('topic_votes')
+                            ->whereColumn('topic_votes.topic_id', 'topics.id');
+                    },
+                    'total_votes'
+                )
+                ->selectSub(
+                    function($query) {
+                        $query->selectRaw('COUNT(*)')
+                            ->from('comments')
+                            ->whereColumn('comments.topic_id', 'topics.id');
+                    },
+                    'total_comments'
+                )
+                ->selectSub(
+                    function($query) {
+                        $query->selectRaw('COUNT(DISTINCT user_id)')
+                            ->from('comments')
+                            ->whereColumn('comments.topic_id', 'topics.id');
+                    },
+                    'unique_commenters'
+                )
                 ->where('status', 'active')
-                ->whereNotNull('community_id');
+                ->where('community_id', '!=', null);
 
+            // ソート方法の適用
             switch ($sort) {
                 case 'new':
                     $query->orderBy('created_at', 'desc');
                     break;
-                case 'top':
-                    $query->orderBy('score', 'desc');
-                    break;
+                
                 case 'hot':
-                    // 人気度計算：投票数 + コメント数 + ユニークコメント者数を考慮
-                    $query->withCount([
-                        'votes as total_votes',
-                        'comments as total_comments',
-                        'comments as unique_commenters' => function ($query) {
-                            $query->distinct('user_id');
+                    try {
+                        // テーブルの存在確認
+                        if (!\Schema::hasTable('topic_votes') || 
+                            !\Schema::hasTable('anonymous_votes') || 
+                            !\Schema::hasTable('comments')) {
+                            \Log::error('Required tables do not exist for hot sorting');
+                            $query->orderBy('created_at', 'desc');
+                            break;
                         }
-                    ])
-                    ->selectRaw('
-                        topics.*,
-                        (
-                            COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
-                            COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
-                            COALESCE(topics.score, 0)
-                        ) as popularity_score
-                    ')
-                    ->orderBy('popularity_score', 'desc');
+
+                        // PostgreSQL対応のホットソート
+                        $query->selectSub(
+                            function($query) {
+                                $query->selectRaw('COUNT(*)')
+                                    ->from('topic_votes')
+                                    ->whereColumn('topic_votes.topic_id', 'topics.id')
+                                    ->where('stance', 'support');
+                            },
+                            'auth_support_votes'
+                        )
+                        ->selectSub(
+                            function($query) {
+                                $query->selectRaw('COUNT(*)')
+                                    ->from('anonymous_votes')
+                                    ->whereColumn('anonymous_votes.topic_id', 'topics.id')
+                                    ->where('stance', 'support');
+                            },
+                            'anon_support_votes'
+                        )
+                        ->selectSub(
+                            function($query) {
+                                $query->selectRaw('COUNT(*)')
+                                    ->from('comments')
+                                    ->whereColumn('comments.topic_id', 'topics.id');
+                            },
+                            'comment_count'
+                        )
+                        ->selectSub(
+                            function($query) {
+                                $query->selectRaw('COUNT(DISTINCT user_id)')
+                                    ->from('comments')
+                                    ->whereColumn('comments.topic_id', 'topics.id');
+                            },
+                            'unique_commenter_count'
+                        )
+                        ->selectRaw('
+                            COALESCE(topics.score, 0) + 
+                            COALESCE(auth_support_votes, 0) + 
+                            COALESCE(anon_support_votes, 0) + 
+                            COALESCE(comment_count, 0) + 
+                            (COALESCE(unique_commenter_count, 0) * 3) as popularity_score
+                        ')
+                        ->orderBy('popularity_score', 'desc');
+                    } catch (\Exception $e) {
+                        \Log::error('HomeController error: ' . $e->getMessage());
+                        $query->orderBy('created_at', 'desc');
+                    }
                     break;
-                case 'rising':
-                    // 上昇中：最近24時間で人気が上昇している議題
-                    $query->where('created_at', '>=', now()->subHours(24))
-                          ->withCount(['votes as recent_votes', 'comments as recent_comments'])
-                          ->orderBy('recent_votes', 'desc')
-                          ->orderBy('recent_comments', 'desc');
-                    break;
+                
                 default:
                     $query->orderBy('created_at', 'desc');
                     break;
             }
 
-            // ページネーション処理
-            $totalCount = $query->count();
-            $topics = $query->offset($offset)->limit($perPage)->get();
+            $topics = $query->limit($perPage)->offset($offset)->get();
             
-            // データ変換処理
-            $posts = $topics->map(function ($topic) {
-                return $this->formatTopicForApi($topic);
-            });
-
             return response()->json([
-                'posts' => $posts->values(),
-                'has_more' => ($offset + $perPage) < $totalCount,
-                'current_page' => $page,
-                'total_pages' => ceil($totalCount / $perPage),
-                'total_count' => $totalCount
+                'topics' => $topics,
+                'has_more' => $topics->count() === $perPage
             ]);
 
         } catch (\Exception $e) {
             \Log::error('getPosts API error: ' . $e->getMessage());
-            return response()->json([
-                'posts' => [],
-                'has_more' => false,
-                'current_page' => 1,
-                'total_pages' => 1,
-                'total_count' => 0,
-                'error' => 'データの取得に失敗しました'
-            ], 500);
+            return response()->json(['error' => 'Internal server error'], 500);
         }
     }
 
