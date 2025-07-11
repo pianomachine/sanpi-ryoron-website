@@ -51,14 +51,34 @@ class HomeController extends Controller
                         ])
                         ->selectRaw('
                             topics.*,
-                            COALESCE(
+                            (
+                                COALESCE(topics.score, 0) + 
                                 (
-                                    COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
-                                    COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
-                                    COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
-                                    COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
-                                    COALESCE(topics.score, 0)
-                                ), 0
+                                    COALESCE((
+                                        SELECT COUNT(*)
+                                        FROM topic_votes
+                                        WHERE topic_votes.topic_id = topics.id
+                                        AND topic_votes.stance = \'support\'
+                                    ), 0) +
+                                    COALESCE((
+                                        SELECT COUNT(*)
+                                        FROM anonymous_votes
+                                        WHERE anonymous_votes.topic_id = topics.id
+                                        AND anonymous_votes.stance = \'support\'
+                                    ), 0)
+                                ) +
+                                COALESCE((
+                                    SELECT COUNT(*)
+                                    FROM comments
+                                    WHERE comments.topic_id = topics.id
+                                ), 0) +
+                                (
+                                    COALESCE((
+                                        SELECT COUNT(DISTINCT user_id)
+                                        FROM comments
+                                        WHERE comments.topic_id = topics.id
+                                    ), 0) * 3
+                                )
                             ) as popularity_score
                         ')
                         ->orderBy('popularity_score', 'desc');
