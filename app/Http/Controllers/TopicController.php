@@ -98,7 +98,6 @@ class TopicController extends Controller
             'description' => $validated['content'], // description フィールドも content で埋める
             'community_id' => $validated['community_id'],
             'user_id' => auth()->id(),
-            'stance' => $validated['stance'],
             'flair' => $validated['flair'],
             'status' => 'active',
             'upvotes' => 0,

@@ -60,6 +60,93 @@ Route::middleware([
     // プロフィール関連API
     Route::get('/profile/topics', [TopicController::class, 'getUserTopics'])->name('profile.topics');
     Route::get('/profile/saved', [TopicController::class, 'getSavedTopics'])->name('profile.saved');
+
+    Route::get('/debug/popular-posts-calculation', function () {
+        $todayStart = now()->startOfDay();
+        $todayTopics = \App\Models\Topic::where('created_at', '>=', $todayStart)
+            ->where('status', 'active')
+            ->count();
+            
+        $searchStart = $todayTopics > 0 ? $todayStart : now()->subDays(3);
+        
+        $topics = \App\Models\Topic::with(['community', 'user'])
+            ->where('created_at', '>=', $searchStart)
+            ->where('status', 'active')
+            ->get();
+            
+        $calculations = $topics->map(function ($topic) {
+            $actualCommentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
+            $uniqueCommenters = \App\Models\Comment::where('topic_id', $topic->id)
+                ->distinct('user_id')
+                ->count('user_id');
+            $authVotes = \App\Models\TopicVote::where('topic_id', $topic->id)->count();
+            $anonVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)->count();
+            $totalVotes = $authVotes + $anonVotes;
+            
+            // 賛成票のみを集計（認証済み + 匿名）
+            $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                ->where('stance', 'support')
+                ->count();
+            $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+                ->where('stance', 'support')
+                ->count();
+            $totalSupportVotes = $authSupportVotes + $anonSupportVotes;
+            
+            $baseScore = $topic->score ?? 0;
+            $commentScore = $actualCommentsCount * 1;
+            $uniqueCommenterScore = $uniqueCommenters * 3;
+            $voteScore = $totalVotes * 1;
+            $popularityScore = $baseScore + $commentScore + $uniqueCommenterScore + $voteScore;
+            
+            return [
+                'topic_id' => $topic->id,
+                'title' => $topic->title,
+                'base_score' => $baseScore,
+                'total_comments' => $actualCommentsCount,
+                'unique_commenters' => $uniqueCommenters,
+                'total_votes' => $totalVotes,
+                'support_votes' => $totalSupportVotes,
+                'oppose_votes' => $totalVotes - $totalSupportVotes,
+                'displayed_score' => $totalSupportVotes, // フロントエンドに表示される「○賛成票」の数値
+                'created_at' => $topic->created_at->toISOString(),
+                'calculation' => [
+                    'base_score' => $baseScore,
+                    'comment_score' => "{$actualCommentsCount} × 1 = {$commentScore}",
+                    'unique_commenter_score' => "{$uniqueCommenters} × 3 = {$uniqueCommenterScore}",
+                    'vote_score' => "{$totalVotes} × 1 = {$voteScore}",
+                    'total_popularity_score' => $popularityScore
+                ],
+                'formula' => "{$baseScore} + ({$actualCommentsCount} × 1) + ({$uniqueCommenters} × 3) + ({$totalVotes} × 1) = {$popularityScore}"
+            ];
+        })->sortByDesc('calculation.total_popularity_score');
+        
+        return response()->json([
+            'search_period' => $todayTopics > 0 ? 'today' : 'last_3_days',
+            'search_start' => $searchStart->toISOString(),
+            'total_topics_found' => $topics->count(),
+            'calculations' => $calculations->values(),
+            'ranking_issue_analysis' => [
+                'note' => '同じ賛成票数でも、ユニークコメンター数(×3)と総投票数が順位に大きく影響します',
+                'factors' => [
+                    'ユニークコメンター数' => '重み3倍',
+                    '総コメント数' => '重み1倍', 
+                    '総投票数（賛成+反対）' => '重み1倍',
+                    '作成日時' => '同スコア時の暗黙ソート'
+                ]
+            ],
+            'explanation' => [
+                'new_formula' => 'popularity_score = base_score + (comments × 1) + (unique_commenters × 3) + (votes × 1)',
+                'improvement' => '同じ人の連続コメントを防ぐため、ユニークコメンター数により高い重みを付与',
+                'score_display_fix' => 'フロントエンドの「○賛成票」表示を実際の賛成投票数（認証済み+匿名）に修正',
+                'benefits' => [
+                    '多様な参加者がいる議論が上位にランク',
+                    '同じ人の連続投稿による不正な人気度上昇を防止',
+                    'より公平で健全な議論評価',
+                    '正確な賛成票数の表示'
+                ]
+            ]
+        ]);
+    });
 });
 
 require __DIR__.'/settings.php';
