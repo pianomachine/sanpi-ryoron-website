@@ -151,6 +151,74 @@ Route::get('/debug/sidebar-data', function () {
     }
 });
 
+// 人気議題の詳細計算を確認するデバッグルート
+Route::get('/debug/popular-posts-calculation', function () {
+    try {
+        $homeController = new \App\Http\Controllers\HomeController();
+        $reflection = new ReflectionClass($homeController);
+        $method = $reflection->getMethod('getPopularPostsToday');
+        $method->setAccessible(true);
+        
+        // 実際の計算結果を取得
+        $popularPosts = $method->invoke($homeController);
+        
+        // 全ての議題の詳細な計算も取得
+        $todayStart = now()->startOfDay();
+        $searchStart = \App\Models\Topic::where('created_at', '>=', $todayStart)->count() > 0 
+            ? $todayStart 
+            : now()->subDays(3);
+            
+        $allTopics = \App\Models\Topic::with(['community', 'user'])
+            ->where('created_at', '>=', $searchStart)
+            ->where('status', 'active')
+            ->get()
+            ->map(function ($topic) {
+                $actualCommentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
+                $authVotes = \App\Models\TopicVote::where('topic_id', $topic->id)->count();
+                $anonVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)->count();
+                $totalVotes = $authVotes + $anonVotes;
+                $popularityScore = ($topic->score ?? 0) + ($actualCommentsCount * 2) + ($totalVotes * 1);
+                
+                return [
+                    'id' => $topic->id,
+                    'title' => $topic->title,
+                    'base_score' => $topic->score ?? 0,
+                    'comments_count' => $actualCommentsCount,
+                    'auth_votes' => $authVotes,
+                    'anon_votes' => $anonVotes,
+                    'total_votes' => $totalVotes,
+                    'popularity_score' => $popularityScore,
+                    'calculation' => [
+                        'base' => $topic->score ?? 0,
+                        'comments_bonus' => $actualCommentsCount * 2,
+                        'votes_bonus' => $totalVotes * 1,
+                        'total' => $popularityScore
+                    ],
+                    'created_at' => $topic->created_at->toDateTimeString()
+                ];
+            })
+            ->sortByDesc('popularity_score');
+        
+        return response()->json([
+            'calculation_time' => now()->toDateTimeString(),
+            'search_period' => [
+                'start' => $searchStart->toDateTimeString(),
+                'description' => $searchStart->isToday() ? 'Today only' : 'Last 3 days'
+            ],
+            'top_5_popular_posts' => $popularPosts,
+            'all_eligible_topics_detailed' => $allTopics->values(),
+            'calculation_formula' => 'popularity_score = base_score + (comments_count × 2) + (total_votes × 1)',
+            'note' => 'This calculation is performed in real-time on every request'
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
 // 管理者用シーダー実行ルート（本番環境でのサンプルデータ作成用）
 Route::get('/admin/seed', function () {
     if (config('app.env') === 'production') {
