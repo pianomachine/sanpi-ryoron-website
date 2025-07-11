@@ -12,6 +12,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('topics:update-hot-score')
                  ->everyFiveMinutes()
                  ->onOneServer();
+
+        $schedule->command('test:schedule')
+                 ->everyMinute();
     }
 
     protected function commands(): void
