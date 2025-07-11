@@ -235,10 +235,10 @@ export default function RedditHome({
                         <div className="lg:col-span-2">
                             {/* Sort Options */}
                             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 p-3">
-                                <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto scrollbar-hide">
+                                <div className="flex items-center justify-evenly">
                                     <Link 
                                         href="/home?sort=hot" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'hot' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
@@ -247,7 +247,7 @@ export default function RedditHome({
                                     </Link>
                                     <Link 
                                         href="/home?sort=new" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'new' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
@@ -256,7 +256,7 @@ export default function RedditHome({
                                     </Link>
                                     <Link 
                                         href="/home?sort=top" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'top' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
@@ -265,7 +265,7 @@ export default function RedditHome({
                                     </Link>
                                     <Link 
                                         href="/home?sort=rising" 
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'rising' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
@@ -277,7 +277,27 @@ export default function RedditHome({
 
                             {/* Posts */}
                             <div className="space-y-3">
-                                {posts.map((post, index) => (
+                                {posts.map((post, index) => [
+                                    // 7個ごとにプレミアムプロモーションを表示
+                                    ...(index > 0 && index % 7 === 0 ? [
+                                        <Card key={`premium-ad-${Math.floor(index / 7)}`} className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700 shadow-sm">
+                                            <CardContent className="p-6 text-center">
+                                                <div className="mb-4">
+                                                    <div className="text-2xl mb-2">⭐</div>
+                                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                                                        賛否両論.com プレミアム
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                                                        プレミアム会員になって広告なしで議論を楽しもう
+                                                    </p>
+                                                </div>
+                                                <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-200 transform hover:scale-105">
+                                                    今すぐ参加
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+                                    ] : []),
+                                    // 通常の投稿
                                     <Card key={`post-${index}`} className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors overflow-hidden p-0">
                                         <div className="flex">
                                             {/* Topic Navigation Section */}
@@ -440,7 +460,7 @@ export default function RedditHome({
                                             </div>
                                         </div>
                                     </Card>
-                                ))}
+                                ]).flat()}
                             </div>
                         </div>
 

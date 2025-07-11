@@ -256,10 +256,10 @@ export default function CommunityShow({ community, posts, current_sort, user }: 
 
                             {/* Sort Options */}
                             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 p-3">
-                                <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto scrollbar-hide">
+                                <div className="flex items-center justify-evenly">
                                     <Link 
                                         href={`/community/${community.slug}?sort=hot`}
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'hot' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
@@ -267,7 +267,7 @@ export default function CommunityShow({ community, posts, current_sort, user }: 
                                     </Link>
                                     <Link 
                                         href={`/community/${community.slug}?sort=new`}
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'new' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >
@@ -275,7 +275,7 @@ export default function CommunityShow({ community, posts, current_sort, user }: 
                                     </Link>
                                     <Link 
                                         href={`/community/${community.slug}?sort=top`}
-                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
+                                        className={`flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                                             current_sort === 'top' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                     >

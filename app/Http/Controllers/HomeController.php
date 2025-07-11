@@ -30,6 +30,34 @@ class HomeController extends Controller
                 case 'top':
                     $query->orderBy('score', 'desc');
                     break;
+                case 'hot':
+                    // 人気度計算：投票数 + コメント数 + ユニークコメント者数を考慮
+                    $query->withCount([
+                        'votes as total_votes',
+                        'comments as total_comments',
+                        'comments as unique_commenters' => function ($query) {
+                            $query->distinct('user_id');
+                        }
+                    ])
+                    ->selectRaw('
+                        topics.*,
+                        (
+                            (SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id) +
+                            (SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id) +
+                            (SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id) +
+                            (SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id) * 3 +
+                            topics.score
+                        ) as popularity_score
+                    ')
+                    ->orderBy('popularity_score', 'desc');
+                    break;
+                case 'rising':
+                    // 上昇中：最近24時間で人気が上昇している議題
+                    $query->where('created_at', '>=', now()->subHours(24))
+                          ->withCount(['votes as recent_votes', 'comments as recent_comments'])
+                          ->orderBy('recent_votes', 'desc')
+                          ->orderBy('recent_comments', 'desc');
+                    break;
                 default:
                     $query->orderBy('created_at', 'desc');
                     break;
@@ -44,6 +72,28 @@ class HomeController extends Controller
             
             // データ変換処理
             $posts = $allTopics->map(function ($topic) {
+                // 実際の投票数を計算
+                $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                    ->where('stance', 'support')
+                    ->count();
+                $authOpposeVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                    ->where('stance', 'oppose')
+                    ->count();
+                    
+                $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+                    ->where('stance', 'support')
+                    ->count();
+                $anonOpposeVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+                    ->where('stance', 'oppose')
+                    ->count();
+                    
+                $supportVotes = $authSupportVotes + $anonSupportVotes;
+                $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
+                $totalVotes = $supportVotes + $opposeVotes;
+
+                // コメント数を計算
+                $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
+                
                 return [
                     'id' => $topic->id,
                     'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
@@ -58,18 +108,19 @@ class HomeController extends Controller
                         'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
                     ],
                     'votes' => [
-                        'upvotes' => $topic->upvotes ?? 0,
-                        'downvotes' => $topic->downvotes ?? 0,
-                        'score' => $topic->score ?? 0
+                        'upvotes' => $supportVotes,
+                        'downvotes' => $opposeVotes,
+                        'score' => $supportVotes
                     ],
-                    'comments_count' => $topic->comments_count ?? 0,
+                    'comments_count' => $commentsCount,
                     'awards' => [],
                     'created_at' => $topic->created_at,
                     'url' => $topic->url,
                     'image_url' => $topic->image_url,
                     'is_nsfw' => $topic->is_nsfw ?? false,
                     'is_spoiler' => $topic->is_spoiler ?? false,
-                    'flair' => $topic->flair
+                    'flair' => $topic->flair,
+                    'popularity_score' => $topic->popularity_score ?? 0
                 ];
             });
             
