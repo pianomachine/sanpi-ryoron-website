@@ -42,11 +42,11 @@ class HomeController extends Controller
                     ->selectRaw('
                         topics.*,
                         (
-                            (SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id) +
-                            (SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id) +
-                            (SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id) +
-                            (SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id) * 3 +
-                            topics.score
+                            COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
+                            COALESCE(topics.score, 0)
                         ) as popularity_score
                     ')
                     ->orderBy('popularity_score', 'desc');
@@ -669,11 +669,11 @@ class HomeController extends Controller
                     ->selectRaw('
                         topics.*,
                         (
-                            (SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id) +
-                            (SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id) +
-                            (SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id) +
-                            (SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id) * 3 +
-                            topics.score
+                            COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
+                            COALESCE(topics.score, 0)
                         ) as popularity_score
                     ')
                     ->orderBy('popularity_score', 'desc');
@@ -763,11 +763,11 @@ class HomeController extends Controller
                     ->selectRaw('
                         topics.*,
                         (
-                            (SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id) +
-                            (SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id) +
-                            (SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id) +
-                            (SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id) * 3 +
-                            topics.score
+                            COALESCE((SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id), 0) +
+                            COALESCE((SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id), 0) * 3 +
+                            COALESCE(topics.score, 0)
                         ) as popularity_score
                     ')
                     ->orderBy('popularity_score', 'desc');
