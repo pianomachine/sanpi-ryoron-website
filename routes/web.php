@@ -64,14 +64,3 @@ Route::middleware([
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
-
-// 一時的なデバッグルート（本番環境での設定確認用）
-Route::get('/debug/config', function () {
-    return response()->json([
-        'workos_client_id' => config('services.workos.client_id') ? 'SET' : 'NOT SET',
-        'workos_secret' => config('services.workos.secret') ? 'SET' : 'NOT SET', 
-        'workos_redirect_url' => config('services.workos.redirect_url'),
-        'app_url' => config('app.url'),
-        'environment' => config('app.env'),
-    ]);
-});
