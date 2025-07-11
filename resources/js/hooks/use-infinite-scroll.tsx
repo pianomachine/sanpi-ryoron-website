@@ -40,6 +40,10 @@ export function useInfiniteScroll({
     const [newlyAddedItems, setNewlyAddedItems] = useState<Set<string | number>>(new Set());
     const [showingSkeleton, setShowingSkeleton] = useState(false);
     
+    // 前回のパラメータを追跡
+    const prevParamsRef = useRef(params);
+    const prevUrlRef = useRef(url);
+    
     // 前回のデータサイズを追跡
     const previousDataSizeRef = useRef(initialData.length);
 
@@ -91,6 +95,8 @@ export function useInfiniteScroll({
     }, [url, params, currentPage, loading, hasMore, enabled]);
 
     const refresh = useCallback(async () => {
+        if (loading) return;
+        
         setLoading(true);
         setError(null);
         setCurrentPage(1);
@@ -121,7 +127,7 @@ export function useInfiniteScroll({
         } finally {
             setLoading(false);
         }
-    }, [url, params]);
+    }, [url, params, loading]);
 
     // アイテムが新しく追加されたかどうかをチェック
     const isItemNew = useCallback((id: string | number) => {
@@ -159,10 +165,15 @@ export function useInfiniteScroll({
 
     // パラメータが変更された時のリフレッシュ
     useEffect(() => {
-        if (enabled) {
+        const paramsChanged = JSON.stringify(prevParamsRef.current) !== JSON.stringify(params);
+        const urlChanged = prevUrlRef.current !== url;
+        
+        if (enabled && (paramsChanged || urlChanged)) {
+            prevParamsRef.current = params;
+            prevUrlRef.current = url;
             refresh();
         }
-    }, [url, JSON.stringify(params), enabled]);
+    }, [url, params, enabled, refresh]);
 
     return {
         data,

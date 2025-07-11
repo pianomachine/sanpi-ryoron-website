@@ -109,8 +109,10 @@ export default function RedditHome({
 
     // ソートが変更された時にリフレッシュ
     useEffect(() => {
-        refresh();
-    }, [current_sort]);
+        if (!loading) {
+            refresh();
+        }
+    }, [current_sort, loading]);
 
     // プレミアムプロモーションを挿入した投稿リストを生成
     const generatePostsWithAds = (posts: Post[]) => {
