@@ -8,7 +8,6 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { SkeletonLoader, LoadingSeparator } from '@/components/skeleton-loader';
 import SortSelector from '@/components/sort-selector';
 import CommonHeader from '@/components/common-header';
-import { NavBarDemo } from '@/components/tubelight-navbar-demo';
 import { 
     ArrowUp, 
     ArrowDown, 
@@ -231,12 +230,12 @@ export default function RedditHome({
         <>
             <Head title="賛否両論.com - ホーム" />
             
-            <CommonHeader user={user} />
-            <NavBarDemo />
-            <div className="container mx-auto px-4 py-8">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+                <CommonHeader user={user} />
+                
                 {/* Main Content */}
                 <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left Sidebar */}
                         <div className="hidden lg:block">
                             <Card className="sticky top-20 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
@@ -512,7 +511,7 @@ export default function RedditHome({
                         </div>
 
                         {/* Right Sidebar */}
-                        <div className="space-y-4">
+                        <div className="hidden lg:block">
                             {/* Popular Posts Today */}
                             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                                 <CardHeader className="pb-3">
