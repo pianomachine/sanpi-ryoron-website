@@ -70,58 +70,9 @@ class HomeController extends Controller
                 return $this->renderEmptyState($request, $sort);
             }
             
-            // データ変換処理
+            // データ変換処理（プレミアムプロモーション無し）
             $posts = $allTopics->map(function ($topic) {
-                // 実際の投票数を計算
-                $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-                    ->where('stance', 'support')
-                    ->count();
-                $authOpposeVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-                    ->where('stance', 'oppose')
-                    ->count();
-                    
-                $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
-                    ->where('stance', 'support')
-                    ->count();
-                $anonOpposeVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
-                    ->where('stance', 'oppose')
-                    ->count();
-                    
-                $supportVotes = $authSupportVotes + $anonSupportVotes;
-                $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
-                $totalVotes = $supportVotes + $opposeVotes;
-
-                // コメント数を計算
-                $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
-                
-                return [
-                    'id' => $topic->id,
-                    'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
-                    'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
-                    'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
-                    'title' => $topic->title,
-                    'content' => $topic->content ?? '',
-                    'type' => $topic->type ?? 'text',
-                    'author' => [
-                        'username' => $topic->user ? $topic->user->name : 'Anonymous',
-                        'karma' => 1000,
-                        'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
-                    ],
-                    'votes' => [
-                        'upvotes' => $supportVotes,
-                        'downvotes' => $opposeVotes,
-                        'score' => $supportVotes
-                    ],
-                    'comments_count' => $commentsCount,
-                    'awards' => [],
-                    'created_at' => $topic->created_at,
-                    'url' => $topic->url,
-                    'image_url' => $topic->image_url,
-                    'is_nsfw' => $topic->is_nsfw ?? false,
-                    'is_spoiler' => $topic->is_spoiler ?? false,
-                    'flair' => $topic->flair,
-                    'popularity_score' => $topic->popularity_score ?? 0
-                ];
+                return $this->formatTopicForApi($topic);
             });
             
             // サイドバーデータの取得
@@ -411,30 +362,9 @@ class HomeController extends Controller
 
         $topics = $query->get();
 
-        // 全ての投稿の実際のコメント数を効率的に取得
-        $topicIds = $topics->pluck('id');
-        $commentsCount = Comment::whereIn('topic_id', $topicIds)
-            ->selectRaw('topic_id, COUNT(*) as comments_count')
-            ->groupBy('topic_id')
-            ->pluck('comments_count', 'topic_id');
-
         // フロントエンド用のデータ形式に変換
-        $posts = $topics->map(function ($topic) use ($commentsCount) {
-            return [
-                'id' => $topic->id,
-                'subreddit' => $topic->community->name,
-                'subreddit_slug' => $topic->community->slug,
-                'title' => $topic->title,
-                'content' => $topic->content,
-                'author' => [
-                    'username' => $topic->user->name,
-                    'karma' => rand(1000, 5000)
-                ],
-                'votes' => ['score' => $topic->score],
-                'comments_count' => $commentsCount[$topic->id] ?? 0,
-                'created_at' => $topic->created_at,
-                'flair' => $topic->flair
-            ];
+        $posts = $topics->take(20)->map(function ($topic) {
+            return $this->formatTopicForApi($topic);
         });
 
         return Inertia::render('community/show', [
@@ -702,5 +632,231 @@ class HomeController extends Controller
             // エラー時は空の配列を返す
             return collect([]);
         }
+    }
+
+    /**
+     * 無限スクロール用：ホームページの投稿を取得
+     */
+    public function getPosts(Request $request)
+    {
+        try {
+            $sort = $request->get('sort', 'hot');
+            $page = (int) $request->get('page', 1);
+            $perPage = 20;
+            $offset = ($page - 1) * $perPage;
+            
+            // トピックの取得
+            $query = Topic::with(['user', 'community'])
+                ->where('status', 'active')
+                ->whereNotNull('community_id');
+
+            switch ($sort) {
+                case 'new':
+                    $query->orderBy('created_at', 'desc');
+                    break;
+                case 'top':
+                    $query->orderBy('score', 'desc');
+                    break;
+                case 'hot':
+                    // 人気度計算：投票数 + コメント数 + ユニークコメント者数を考慮
+                    $query->withCount([
+                        'votes as total_votes',
+                        'comments as total_comments',
+                        'comments as unique_commenters' => function ($query) {
+                            $query->distinct('user_id');
+                        }
+                    ])
+                    ->selectRaw('
+                        topics.*,
+                        (
+                            (SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id) +
+                            (SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id) +
+                            (SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id) +
+                            (SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id) * 3 +
+                            topics.score
+                        ) as popularity_score
+                    ')
+                    ->orderBy('popularity_score', 'desc');
+                    break;
+                case 'rising':
+                    // 上昇中：最近24時間で人気が上昇している議題
+                    $query->where('created_at', '>=', now()->subHours(24))
+                          ->withCount(['votes as recent_votes', 'comments as recent_comments'])
+                          ->orderBy('recent_votes', 'desc')
+                          ->orderBy('recent_comments', 'desc');
+                    break;
+                default:
+                    $query->orderBy('created_at', 'desc');
+                    break;
+            }
+
+            // ページネーション処理
+            $totalCount = $query->count();
+            $topics = $query->offset($offset)->limit($perPage)->get();
+            
+            // データ変換処理
+            $posts = $topics->map(function ($topic) {
+                return $this->formatTopicForApi($topic);
+            });
+
+            return response()->json([
+                'posts' => $posts->values(),
+                'has_more' => ($offset + $perPage) < $totalCount,
+                'current_page' => $page,
+                'total_pages' => ceil($totalCount / $perPage),
+                'total_count' => $totalCount
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('getPosts API error: ' . $e->getMessage());
+            return response()->json([
+                'posts' => [],
+                'has_more' => false,
+                'current_page' => 1,
+                'total_pages' => 1,
+                'total_count' => 0,
+                'error' => 'データの取得に失敗しました'
+            ], 500);
+        }
+    }
+
+    /**
+     * 無限スクロール用：コミュニティの投稿を取得
+     */
+    public function getCommunityPosts(Request $request, $slug)
+    {
+        try {
+            $sort = $request->get('sort', 'hot');
+            $page = (int) $request->get('page', 1);
+            $perPage = 20;
+            $offset = ($page - 1) * $perPage;
+
+            // コミュニティを取得
+            $community = Community::where('slug', $slug)->first();
+            if (!$community) {
+                return response()->json(['error' => 'コミュニティが見つかりません'], 404);
+            }
+
+            // そのコミュニティの投稿をデータベースから取得
+            $query = Topic::with(['user', 'community'])
+                ->where('community_id', $community->id)
+                ->where('status', 'active');
+
+            // ソート
+            switch ($sort) {
+                case 'new':
+                    $query->orderBy('created_at', 'desc');
+                    break;
+                case 'top':
+                    $query->orderBy('score', 'desc');
+                    break;
+                case 'hot':
+                default:
+                    // 人気度計算
+                    $query->withCount([
+                        'votes as total_votes',
+                        'comments as total_comments',
+                        'comments as unique_commenters' => function ($query) {
+                            $query->distinct('user_id');
+                        }
+                    ])
+                    ->selectRaw('
+                        topics.*,
+                        (
+                            (SELECT COUNT(*) FROM topic_votes WHERE topic_votes.topic_id = topics.id) +
+                            (SELECT COUNT(*) FROM anonymous_votes WHERE anonymous_votes.topic_id = topics.id) +
+                            (SELECT COUNT(*) FROM comments WHERE comments.topic_id = topics.id) +
+                            (SELECT COUNT(DISTINCT user_id) FROM comments WHERE comments.topic_id = topics.id) * 3 +
+                            topics.score
+                        ) as popularity_score
+                    ')
+                    ->orderBy('popularity_score', 'desc');
+                    break;
+            }
+
+            // ページネーション処理
+            $totalCount = $query->count();
+            $topics = $query->offset($offset)->limit($perPage)->get();
+
+            // データ変換処理
+            $posts = $topics->map(function ($topic) {
+                return $this->formatTopicForApi($topic);
+            });
+
+            return response()->json([
+                'posts' => $posts->values(),
+                'has_more' => ($offset + $perPage) < $totalCount,
+                'current_page' => $page,
+                'total_pages' => ceil($totalCount / $perPage),
+                'total_count' => $totalCount
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('getCommunityPosts API error: ' . $e->getMessage());
+            return response()->json([
+                'posts' => [],
+                'has_more' => false,
+                'current_page' => 1,
+                'total_pages' => 1,
+                'total_count' => 0,
+                'error' => 'データの取得に失敗しました'
+            ], 500);
+        }
+    }
+
+    /**
+     * API用にトピックをフォーマット
+     */
+    private function formatTopicForApi($topic)
+    {
+        // 実際の投票数を計算
+        $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+            ->where('stance', 'support')
+            ->count();
+        $authOpposeVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+            ->where('stance', 'oppose')
+            ->count();
+            
+        $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+            ->where('stance', 'support')
+            ->count();
+        $anonOpposeVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+            ->where('stance', 'oppose')
+            ->count();
+            
+        $supportVotes = $authSupportVotes + $anonSupportVotes;
+        $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
+
+        // コメント数を計算
+        $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
+        
+        return [
+            'id' => $topic->id,
+            'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
+            'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
+            'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
+            'title' => $topic->title,
+            'content' => $topic->content ?? '',
+            'type' => $topic->type ?? 'text',
+            'author' => [
+                'username' => $topic->user ? $topic->user->name : 'Anonymous',
+                'karma' => 1000,
+                'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
+            ],
+            'votes' => [
+                'upvotes' => $supportVotes,
+                'downvotes' => $opposeVotes,
+                'score' => $supportVotes
+            ],
+            'comments_count' => $commentsCount,
+            'awards' => [],
+            'created_at' => $topic->created_at,
+            'url' => $topic->url,
+            'image_url' => $topic->image_url,
+            'is_nsfw' => $topic->is_nsfw ?? false,
+            'is_spoiler' => $topic->is_spoiler ?? false,
+            'flair' => $topic->flair,
+            'popularity_score' => $topic->popularity_score ?? 0
+        ];
     }
 }

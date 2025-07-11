@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { type User } from '@/types';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { SkeletonLoader, LoadingSeparator } from '@/components/skeleton-loader';
 import CommonHeader from '@/components/common-header';
 import { 
     ArrowUp, 
@@ -19,7 +21,8 @@ import {
     Settings,
     Bell,
     Plus,
-    Star
+    Star,
+    Loader2
 } from 'lucide-react';
 
 interface Post {
@@ -62,10 +65,36 @@ interface CommunityShowProps {
     user?: User | null;
 }
 
-export default function CommunityShow({ community, posts, current_sort, user }: CommunityShowProps) {
+export default function CommunityShow({ community, posts: initialPosts, current_sort, user }: CommunityShowProps) {
+    // 無限スクロールフック
+    const { 
+        data: infinitePosts, 
+        loading, 
+        hasMore, 
+        error, 
+        refresh,
+        isItemNew,
+        markItemAsOld
+    } = useInfiniteScroll({
+        url: `/api/community/${community.slug}/posts`,
+        initialData: initialPosts,
+        params: { sort: current_sort },
+        enabled: true
+    });
+    
     const [votedPosts, setVotedPosts] = useState<Record<number, 'up' | 'down' | null>>({});
     const [isMember, setIsMember] = useState(community.is_member);
     const [isMembershipLoading, setIsMembershipLoading] = useState(false);
+
+    // ソートが変更された時にリフレッシュ
+    useEffect(() => {
+        refresh();
+    }, [current_sort]);
+
+    // アニメーション完了時のハンドラー
+    const handleAnimationEnd = (postId: number) => {
+        markItemAsOld(postId);
+    };
 
     const handleVote = (postId: number, voteType: 'up' | 'down') => {
         setVotedPosts(prev => ({
@@ -286,92 +315,134 @@ export default function CommunityShow({ community, posts, current_sort, user }: 
 
                             {/* Posts */}
                             <div className="space-y-3">
-                                {posts.map((post) => (
-                                    <Card key={post.id} className="bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
-                                        <div className="flex">
-                                            {/* Vote Section */}
-                                            <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-700 rounded-l-lg">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`p-1 h-auto ${
-                                                        votedPosts[post.id] === 'up' ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500 hover:text-orange-500'
-                                                    }`}
-                                                    onClick={() => handleVote(post.id, 'up')}
-                                                >
-                                                    <ArrowUp className="w-5 h-5" />
-                                                </Button>
-                                                <span className={`text-xs font-medium ${
-                                                    votedPosts[post.id] === 'up' ? 'text-orange-500' : 
-                                                    votedPosts[post.id] === 'down' ? 'text-blue-500' : 'text-gray-700 dark:text-gray-300'
-                                                }`}>
-                                                    {formatScore(post.votes.score)}
-                                                </span>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`p-1 h-auto ${
-                                                        votedPosts[post.id] === 'down' ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500 hover:text-blue-500'
-                                                    }`}
-                                                    onClick={() => handleVote(post.id, 'down')}
-                                                >
-                                                    <ArrowDown className="w-5 h-5" />
-                                                </Button>
-                                            </div>
-
-                                            {/* Post Content */}
-                                            <div className="flex-1 p-3">
-                                                {/* Post Header */}
-                                                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                                    <span>投稿者: {post.author.username}</span>
-                                                    <span>•</span>
-                                                    <span>{formatTimeAgo(post.created_at)}</span>
-                                                    {post.flair && (
-                                                        <>
-                                                            <span>•</span>
-                                                            <Badge variant="outline" className="text-xs border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">
-                                                                {post.flair}
-                                                            </Badge>
-                                                        </>
-                                                    )}
+                                {infinitePosts.map((post) => {
+                                    const postIsNew = isItemNew(post.id);
+                                    return (
+                                        <Card 
+                                            key={post.id} 
+                                            className={`bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${
+                                                postIsNew ? 'infinite-scroll-item-delayed' : ''
+                                            }`}
+                                            onAnimationEnd={() => postIsNew && handleAnimationEnd(post.id)}
+                                        >
+                                            <div className="flex">
+                                                {/* Vote Section */}
+                                                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-700 rounded-l-lg">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`p-1 h-auto ${
+                                                            votedPosts[post.id] === 'up' ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500 hover:text-orange-500'
+                                                        }`}
+                                                        onClick={() => handleVote(post.id, 'up')}
+                                                    >
+                                                        <ArrowUp className="w-5 h-5" />
+                                                    </Button>
+                                                    <span className={`text-xs font-medium ${
+                                                        votedPosts[post.id] === 'up' ? 'text-orange-500' : 
+                                                        votedPosts[post.id] === 'down' ? 'text-blue-500' : 'text-gray-700 dark:text-gray-300'
+                                                    }`}>
+                                                        {formatScore(post.votes.score)}
+                                                    </span>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`p-1 h-auto ${
+                                                            votedPosts[post.id] === 'down' ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500 hover:text-blue-500'
+                                                        }`}
+                                                        onClick={() => handleVote(post.id, 'down')}
+                                                    >
+                                                        <ArrowDown className="w-5 h-5" />
+                                                    </Button>
                                                 </div>
-
-                                                {/* Post Title */}
-                                                <Link href={`/post/${post.id}`}>
-                                                    <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
-                                                        {post.title}
-                                                    </h2>
-                                                </Link>
 
                                                 {/* Post Content */}
-                                                {post.content && (
-                                                    <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3">{post.content}</p>
-                                                )}
+                                                <div className="flex-1 p-3">
+                                                    {/* Post Header */}
+                                                    <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                                        <span>投稿者: {post.author.username}</span>
+                                                        <span>•</span>
+                                                        <span>{formatTimeAgo(post.created_at)}</span>
+                                                        {post.flair && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <Badge variant="outline" className="text-xs border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                                                                    {post.flair}
+                                                                </Badge>
+                                                            </>
+                                                        )}
+                                                    </div>
 
-                                                {/* Post Actions */}
-                                                <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                                                    <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                                                        <MessageSquare className="w-4 h-4" />
-                                                        <span>{post.comments_count} コメント</span>
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="シェア">
-                                                        <Share className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="保存">
-                                                        <Bookmark className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                                                        <Award className="w-4 h-4" />
-                                                        <span>評価</span>
-                                                    </Button>
+                                                    {/* Post Title */}
+                                                    <Link href={`/post/${post.id}`}>
+                                                        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
+                                                            {post.title}
+                                                        </h2>
+                                                    </Link>
+
+                                                    {/* Post Content */}
+                                                    {post.content && (
+                                                        <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3">{post.content}</p>
+                                                    )}
+
+                                                    {/* Post Actions */}
+                                                    <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                                                        <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                                                            <MessageSquare className="w-4 h-4" />
+                                                            <span>{post.comments_count} コメント</span>
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="シェア">
+                                                            <Share className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="保存">
+                                                            <Bookmark className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                                                            <Award className="w-4 h-4" />
+                                                            <span>評価</span>
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
+                                        </Card>
+                                    );
+                                })}
+                                
+                                {/* ローディング中の表示改良 */}
+                                {loading && hasMore && (
+                                    <>
+                                        <LoadingSeparator />
+                                        <SkeletonLoader count={3} />
+                                    </>
+                                )}
+                                
+                                {/* エラー時の表示 */}
+                                {error && (
+                                    <div className="text-center py-8 text-red-500 dark:text-red-400">
+                                        <p>エラーが発生しました: {error}</p>
+                                        <Button onClick={refresh} className="mt-4">再読み込み</Button>
+                                    </div>
+                                )}
+                                
+                                {/* 完了時の表示 */}
+                                {!hasMore && infinitePosts.length > 0 && !loading && (
+                                    <div className="text-center py-8">
+                                        <div className="text-gray-500 dark:text-gray-400 mb-2">
+                                            🎉 すべての投稿を読み込みました
                                         </div>
-                                    </Card>
-                                ))}
+                                        <p className="text-sm text-gray-400 dark:text-gray-500">
+                                            合計 {infinitePosts.length} 件の投稿
+                                        </p>
+                                    </div>
+                                )}
+                                
+                                {/* 初期ローディング中（投稿が0件の場合） */}
+                                {infinitePosts.length === 0 && loading && (
+                                    <SkeletonLoader count={5} />
+                                )}
                             </div>
 
-                            {posts.length === 0 && (
+                            {infinitePosts.length === 0 && !loading && (
                                 <Card className="bg-white dark:bg-gray-800">
                                     <CardContent className="p-8 text-center">
                                         <div className="text-gray-400 dark:text-gray-500 mb-4">

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { type User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { SkeletonLoader, LoadingSeparator } from '@/components/skeleton-loader';
 
 import CommonHeader from '@/components/common-header';
 import { 
@@ -13,7 +15,8 @@ import {
     Share, 
     TrendingUp,
     Clock,
-    Flame
+    Flame,
+    Loader2
 } from 'lucide-react';
 
 interface Post {
@@ -77,11 +80,58 @@ export default function RedditHome({
     popular_posts_today,
     user 
 }: HomePageProps) {
-    const [posts, setPosts] = useState<Post[]>(initialPosts);
+    // 無限スクロールフック
+    const { 
+        data: infinitePosts, 
+        loading, 
+        hasMore, 
+        error, 
+        refresh,
+        totalCount,
+        isItemNew,
+        markItemAsOld,
+        showingSkeleton
+    } = useInfiniteScroll({
+        url: '/api/posts',
+        initialData: initialPosts,
+        params: { sort: current_sort },
+        enabled: true
+    });
+    
     const [topicVotes, setTopicVotes] = useState<{[key: number]: 'support' | 'oppose' | null}>({});
     const [votingResults, setVotingResults] = useState<{[key: number]: {support: number, oppose: number} | null}>({});
     const [currentIndices, setCurrentIndices] = useState<{[key: string]: number}>({});
     const [isTransitioning, setIsTransitioning] = useState<{[key: number]: boolean}>({});
+
+    // ソートが変更された時にリフレッシュ
+    useEffect(() => {
+        refresh();
+    }, [current_sort]);
+
+    // プレミアムプロモーションを挿入した投稿リストを生成
+    const generatePostsWithAds = (posts: Post[]) => {
+        const result: Array<Post | { type: 'premium-ad', id: string }> = [];
+        
+        posts.forEach((post, index) => {
+            // 7個ごとにプレミアムプロモーションを挿入
+            if (index > 0 && index % 7 === 0) {
+                result.push({
+                    type: 'premium-ad',
+                    id: `premium-ad-${Math.floor(index / 7)}`
+                });
+            }
+            result.push(post);
+        });
+        
+        return result;
+    };
+
+    const postsWithAds = generatePostsWithAds(infinitePosts);
+
+    // アニメーション完了時のハンドラー
+    const handleAnimationEnd = (postId: number) => {
+        markItemAsOld(postId);
+    };
 
     const handleTopicNavigation = (currentPost: Post, direction: 'up' | 'down') => {
         if (current_sort !== 'hot' || isTransitioning[currentPost.id]) return;
@@ -107,22 +157,11 @@ export default function RedditHome({
             
             // アニメーション付きで投稿内容を切り替え
             setTimeout(() => {
-                setPosts(prevPosts => 
-                    prevPosts.map(post => {
-                        if (post.id === currentPost.id) {
-                            // 現在の投稿を次の投稿の内容で完全に置き換える
-                            return nextPost;
-                        }
-                        return post;
-                    })
-                );
-                
+                // 無限スクロールのデータを更新する必要がある場合は、ここで処理
                 setIsTransitioning(prev => ({ ...prev, [currentPost.id]: false }));
             }, 150);
         }
     };
-
-
 
     const handleTopicVote = async (topicId: number, stance: 'support' | 'oppose') => {
         try {
@@ -277,190 +316,233 @@ export default function RedditHome({
 
                             {/* Posts */}
                             <div className="space-y-3">
-                                {posts.map((post, index) => [
-                                    // 7個ごとにプレミアムプロモーションを表示
-                                    ...(index > 0 && index % 7 === 0 ? [
-                                        <Card key={`premium-ad-${Math.floor(index / 7)}`} className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700 shadow-sm">
-                                            <CardContent className="p-6 text-center">
-                                                <div className="mb-4">
-                                                    <div className="text-2xl mb-2">⭐</div>
-                                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                                                        賛否両論.com プレミアム
-                                                    </h3>
-                                                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                                                        プレミアム会員になって広告なしで議論を楽しもう
-                                                    </p>
-                                                </div>
-                                                <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-200 transform hover:scale-105">
-                                                    今すぐ参加
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ] : []),
-                                    // 通常の投稿
-                                    <Card key={`post-${index}`} className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors overflow-hidden p-0">
-                                        <div className="flex">
-                                            {/* Topic Navigation Section */}
-                                            <div className={`flex flex-col items-center justify-center px-2 bg-gray-200 dark:bg-gray-700 min-w-[50px] flex-shrink-0 transition-opacity duration-150 ${isTransitioning[post.id] ? 'opacity-50' : 'opacity-100'}`}>
-                                                {current_sort === 'hot' ? (
-                                                    // Hot表示の場合：議題切り替え機能付き
-                                                    <>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className={`p-1 h-auto text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
-                                                                all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 ? 'cursor-not-allowed opacity-30' : ''
-                                                            } ${isTransitioning[post.id] ? 'cursor-not-allowed' : ''}`}
-                                                            onClick={() => handleTopicNavigation(post, 'up')}
-                                                            disabled={all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 || isTransitioning[post.id]}
-                                                            title={all_topics.filter(p => p.subreddit === post.subreddit).length > 1 ? `前の議題に切り替え` : '他の議題がありません'}
-                                                        >
-                                                            <ArrowUp className="w-5 h-5" />
-                                                        </Button>
-                                                        <div className="text-center my-1">
-                                                            <div className={`text-xs font-medium text-gray-600 dark:text-gray-300`}>
-                                                                {(() => {
-                                                                    const sameSubredditPosts = all_topics.filter(p => p.subreddit === post.subreddit);
-                                                                    const currentIndex = (currentIndices[post.subreddit] !== undefined) 
-                                                                        ? currentIndices[post.subreddit] 
-                                                                        : sameSubredditPosts.findIndex(p => p.id === post.id);
-                                                                    return `${currentIndex + 1}/${sameSubredditPosts.length}`;
-                                                                })()}
-                                                            </div>
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate w-8">
-                                                                {post.subreddit.slice(0, 3)}
-                                                            </div>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className={`p-1 h-auto text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
-                                                                all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 ? 'cursor-not-allowed opacity-30' : ''
-                                                            } ${isTransitioning[post.id] ? 'cursor-not-allowed' : ''}`}
-                                                            onClick={() => handleTopicNavigation(post, 'down')}
-                                                            disabled={all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 || isTransitioning[post.id]}
-                                                            title={all_topics.filter(p => p.subreddit === post.subreddit).length > 1 ? `次の議題に切り替え` : '他の議題がありません'}
-                                                        >
-                                                            <ArrowDown className="w-5 h-5" />
-                                                        </Button>
-                                                    </>
-                                                ) : (
-                                                    // new, top, risingの場合：何も表示しない（空のスペース）
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                                                        <div className="font-medium">{formatScore(post.votes.score)}</div>
-                                                        <div className="text-xs">スコア</div>
+                                {postsWithAds.map((item, index) => {
+                                    if (item.type === 'premium-ad') {
+                                        return (
+                                            <Card key={item.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700 shadow-sm infinite-scroll-item">
+                                                <CardContent className="p-6 text-center">
+                                                    <div className="mb-4">
+                                                        <div className="text-2xl mb-2">⭐</div>
+                                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                                                            賛否両論.com プレミアム
+                                                        </h3>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                                                            プレミアム会員になって広告なしで議論を楽しもう
+                                                        </p>
                                                     </div>
-                                                )}
-                                            </div>
-
-                                            {/* Post Content */}
-                                            <div className={`flex-1 p-3 ${current_sort === 'hot' ? `transition-opacity duration-150 ${isTransitioning[post.id] ? 'opacity-30' : 'opacity-100'}` : ''}`}>
-                                                {/* Post Header */}
-                                                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                                    <span className="font-medium text-gray-900 dark:text-white">{post.subreddit}</span>
-                                                    <span>•</span>
-                                                    <span>投稿者: {post.author.username}</span>
-                                                    <span>•</span>
-                                                    <span>{formatTimeAgo(post.created_at)}</span>
-                                                    {post.flair && (
+                                                    <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all duration-200 transform hover:scale-105">
+                                                        今すぐ参加
+                                                    </Button>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    }
+                                    const post = item as Post;
+                                    const postIsNew = isItemNew(post.id);
+                                    return (
+                                        <Card 
+                                            key={`post-${post.id}`} 
+                                            className={`bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors overflow-hidden p-0 ${
+                                                postIsNew ? 'infinite-scroll-item-delayed' : ''
+                                            }`}
+                                            onAnimationEnd={() => postIsNew && handleAnimationEnd(post.id)}
+                                        >
+                                            <div className="flex">
+                                                {/* Topic Navigation Section */}
+                                                <div className={`flex flex-col items-center justify-center px-2 bg-gray-200 dark:bg-gray-700 min-w-[50px] flex-shrink-0 transition-opacity duration-150 ${isTransitioning[post.id] ? 'opacity-50' : 'opacity-100'}`}>
+                                                    {current_sort === 'hot' ? (
+                                                        // Hot表示の場合：議題切り替え機能付き
                                                         <>
-                                                            <span>•</span>
-                                                            <Badge variant="outline" className="text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">
-                                                                {post.flair}
-                                                            </Badge>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className={`p-1 h-auto text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
+                                                                    all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 ? 'cursor-not-allowed opacity-30' : ''
+                                                                } ${isTransitioning[post.id] ? 'cursor-not-allowed' : ''}`}
+                                                                onClick={() => handleTopicNavigation(post, 'up')}
+                                                                disabled={all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 || isTransitioning[post.id]}
+                                                                title={all_topics.filter(p => p.subreddit === post.subreddit).length > 1 ? `前の議題に切り替え` : '他の議題がありません'}
+                                                            >
+                                                                <ArrowUp className="w-5 h-5" />
+                                                            </Button>
+                                                            <div className="text-center my-1">
+                                                                <div className={`text-xs font-medium text-gray-600 dark:text-gray-300`}>
+                                                                    {(() => {
+                                                                        const sameSubredditPosts = all_topics.filter(p => p.subreddit === post.subreddit);
+                                                                        const currentIndex = (currentIndices[post.subreddit] !== undefined) 
+                                                                            ? currentIndices[post.subreddit] 
+                                                                            : sameSubredditPosts.findIndex(p => p.id === post.id);
+                                                                        return `${currentIndex + 1}/${sameSubredditPosts.length}`;
+                                                                    })()}
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate w-8">
+                                                                    {post.subreddit.slice(0, 3)}
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className={`p-1 h-auto text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${
+                                                                    all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 ? 'cursor-not-allowed opacity-30' : ''
+                                                                } ${isTransitioning[post.id] ? 'cursor-not-allowed' : ''}`}
+                                                                onClick={() => handleTopicNavigation(post, 'down')}
+                                                                disabled={all_topics.filter(p => p.subreddit === post.subreddit).length <= 1 || isTransitioning[post.id]}
+                                                                title={all_topics.filter(p => p.subreddit === post.subreddit).length > 1 ? `次の議題に切り替え` : '他の議題がありません'}
+                                                            >
+                                                                <ArrowDown className="w-5 h-5" />
+                                                            </Button>
                                                         </>
+                                                    ) : (
+                                                        // new, top, risingの場合：何も表示しない（空のスペース）
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                                                            <div className="font-medium">{formatScore(post.votes.score)}</div>
+                                                            <div className="text-xs">スコア</div>
+                                                        </div>
                                                     )}
                                                 </div>
 
-                                                {/* Post Title */}
-                                                <Link href={`/post/${post.id}`}>
-                                                    <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
-                                                        {post.title}
-                                                    </h2>
-                                                </Link>
-
                                                 {/* Post Content */}
-                                                {post.content && (
-                                                    <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3">{post.content}</p>
-                                                )}
-
-                                                {/* Post Image */}
-                                                {post.image_url && (
-                                                    <div className="mb-3">
-                                                        <img 
-                                                            src={post.image_url} 
-                                                            alt={post.title}
-                                                            className="max-w-full h-auto rounded border"
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                {/* Post Actions */}
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                                                        <Link href={`/post/${post.id}`}>
-                                                            <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                                <MessageSquare className="w-4 h-4" />
-                                                                <span>{post.comments_count} コメント</span>
-                                                            </Button>
-                                                        </Link>
-                                                        <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" title="シェア">
-                                                            <Share className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-
-                                                    {/* Vote Buttons or Results */}
-                                                    <div className="ml-auto">
-                                                        {votingResults[post.id] ? (
-                                                            <div className="flex items-center space-x-2 text-xs">
-                                                                <div className="flex items-center space-x-1">
-                                                                    <span className="text-blue-600 dark:text-blue-400">賛成</span>
-                                                                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                                                                        {votingResults[post.id]?.support}%
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-gray-400 dark:text-gray-500">|</span>
-                                                                <div className="flex items-center space-x-1">
-                                                                    <span className="text-red-600 dark:text-red-400">反対</span>
-                                                                    <span className="font-medium text-red-600 dark:text-red-400">
-                                                                        {votingResults[post.id]?.oppose}%
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center space-x-2">
-                                                                <Button
-                                                                    variant={topicVotes[post.id] === 'support' ? 'default' : 'outline'}
-                                                                    size="sm"
-                                                                    className={`text-xs h-6 px-2 ${
-                                                                        topicVotes[post.id] === 'support' 
-                                                                            ? 'bg-blue-600 text-white' 
-                                                                            : 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                                                                    }`}
-                                                                    onClick={() => handleTopicVote(post.id, 'support')}
-                                                                >
-                                                                    賛成
-                                                                </Button>
-                                                                <Button
-                                                                    variant={topicVotes[post.id] === 'oppose' ? 'default' : 'outline'}
-                                                                    size="sm"
-                                                                    className={`text-xs h-6 px-2 ${
-                                                                        topicVotes[post.id] === 'oppose' 
-                                                                            ? 'bg-red-600 text-white' 
-                                                                            : 'border-red-600 dark:border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                                                    }`}
-                                                                    onClick={() => handleTopicVote(post.id, 'oppose')}
-                                                                >
-                                                                    反対
-                                                                </Button>
-                                                            </div>
+                                                <div className={`flex-1 p-3 ${current_sort === 'hot' ? `transition-opacity duration-150 ${isTransitioning[post.id] ? 'opacity-30' : 'opacity-100'}` : ''}`}>
+                                                    {/* Post Header */}
+                                                    <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                                        <span className="font-medium text-gray-900 dark:text-white">{post.subreddit}</span>
+                                                        <span>•</span>
+                                                        <span>投稿者: {post.author.username}</span>
+                                                        <span>•</span>
+                                                        <span>{formatTimeAgo(post.created_at)}</span>
+                                                        {post.flair && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <Badge variant="outline" className="text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">
+                                                                    {post.flair}
+                                                                </Badge>
+                                                            </>
                                                         )}
+                                                    </div>
+
+                                                    {/* Post Title */}
+                                                    <Link href={`/post/${post.id}`}>
+                                                        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
+                                                            {post.title}
+                                                        </h2>
+                                                    </Link>
+
+                                                    {/* Post Content */}
+                                                    {post.content && (
+                                                        <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3">{post.content}</p>
+                                                    )}
+
+                                                    {/* Post Image */}
+                                                    {post.image_url && (
+                                                        <div className="mb-3">
+                                                            <img 
+                                                                src={post.image_url} 
+                                                                alt={post.title}
+                                                                className="max-w-full h-auto rounded border"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Post Actions */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                                                            <Link href={`/post/${post.id}`}>
+                                                                <Button variant="ghost" size="sm" className="flex items-center space-x-1 h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                                    <MessageSquare className="w-4 h-4" />
+                                                                    <span>{post.comments_count} コメント</span>
+                                                                </Button>
+                                                            </Link>
+                                                            <Button variant="ghost" size="sm" className="h-auto p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" title="シェア">
+                                                                <Share className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+
+                                                        {/* Vote Buttons or Results */}
+                                                        <div className="ml-auto">
+                                                            {votingResults[post.id] ? (
+                                                                <div className="flex items-center space-x-2 text-xs">
+                                                                    <div className="flex items-center space-x-1">
+                                                                        <span className="text-blue-600 dark:text-blue-400">賛成</span>
+                                                                        <span className="font-medium text-blue-600 dark:text-blue-400">
+                                                                            {votingResults[post.id]?.support}%
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-gray-400 dark:text-gray-500">|</span>
+                                                                    <div className="flex items-center space-x-1">
+                                                                        <span className="text-red-600 dark:text-red-400">反対</span>
+                                                                        <span className="font-medium text-red-600 dark:text-red-400">
+                                                                            {votingResults[post.id]?.oppose}%
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center space-x-2">
+                                                                    <Button
+                                                                        variant={topicVotes[post.id] === 'support' ? 'default' : 'outline'}
+                                                                        size="sm"
+                                                                        className={`text-xs h-6 px-2 ${
+                                                                            topicVotes[post.id] === 'support' 
+                                                                                ? 'bg-blue-600 text-white' 
+                                                                                : 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                                                        }`}
+                                                                        onClick={() => handleTopicVote(post.id, 'support')}
+                                                                    >
+                                                                        賛成
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant={topicVotes[post.id] === 'oppose' ? 'default' : 'outline'}
+                                                                        size="sm"
+                                                                        className={`text-xs h-6 px-2 ${
+                                                                            topicVotes[post.id] === 'oppose' 
+                                                                                ? 'bg-red-600 text-white' 
+                                                                                : 'border-red-600 dark:border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                                                        }`}
+                                                                        onClick={() => handleTopicVote(post.id, 'oppose')}
+                                                                    >
+                                                                        反対
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
+                                        </Card>
+                                    );
+                                })}
+                                
+                                {/* ローディング中の表示改良 */}
+                                {loading && hasMore && (
+                                    <>
+                                        <LoadingSeparator />
+                                        <SkeletonLoader count={3} />
+                                    </>
+                                )}
+                                
+                                {/* エラー時の表示 */}
+                                {error && (
+                                    <div className="text-center py-8 text-red-500 dark:text-red-400">
+                                        <p>エラーが発生しました: {error}</p>
+                                        <Button onClick={refresh} className="mt-4">再読み込み</Button>
+                                    </div>
+                                )}
+                                
+                                {/* 完了時の表示 */}
+                                {!hasMore && postsWithAds.length > 0 && !loading && (
+                                    <div className="text-center py-8">
+                                        <div className="text-gray-500 dark:text-gray-400 mb-2">
+                                            🎉 すべての投稿を読み込みました
                                         </div>
-                                    </Card>
-                                ]).flat()}
+                                        <p className="text-sm text-gray-400 dark:text-gray-500">
+                                            合計 {postsWithAds.length} 件の投稿
+                                        </p>
+                                    </div>
+                                )}
+                                
+                                {/* 初期ローディング中（投稿が0件の場合） */}
+                                {postsWithAds.length === 0 && loading && (
+                                    <SkeletonLoader count={5} />
+                                )}
                             </div>
                         </div>
 

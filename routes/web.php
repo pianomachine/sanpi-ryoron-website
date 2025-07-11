@@ -22,6 +22,10 @@ Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/post/{id}', [HomeController::class, 'show'])->name('post.show');
 Route::get('/community/{slug}', [HomeController::class, 'community'])->name('community.show');
 
+// 無限スクロール用のAPIエンドポイントを追加
+Route::get('/api/posts', [HomeController::class, 'getPosts'])->name('api.posts');
+Route::get('/api/community/{slug}/posts', [HomeController::class, 'getCommunityPosts'])->name('api.community.posts');
+
 // 投票機能（匿名投票対応）
 Route::post('/topics/{topic}/vote', [TopicController::class, 'voteTopic'])->name('topics.vote');
 
