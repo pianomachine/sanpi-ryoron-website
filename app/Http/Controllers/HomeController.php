@@ -41,50 +41,33 @@ class HomeController extends Controller
                             break;
                         }
 
-                        // PostgreSQL対応のホットソート
-                        $query->select('topics.*')
-                            ->selectSub(
-                                function($query) {
-                                    $query->selectRaw('COUNT(*)')
-                                        ->from('topic_votes')
-                                        ->whereColumn('topic_votes.topic_id', 'topics.id')
-                                        ->where('stance', 'support');
-                                },
-                                'auth_support_votes'
+                        // PostgreSQL対応のホットソート - サブクエリを1つにまとめる
+                        $query->addSelect(\DB::raw('(
+                            COALESCE(topics.score, 0) + 
+                            (
+                                SELECT COALESCE(COUNT(*), 0)
+                                FROM topic_votes
+                                WHERE topic_votes.topic_id = topics.id
+                                AND topic_votes.stance = \'support\'
+                            ) +
+                            (
+                                SELECT COALESCE(COUNT(*), 0)
+                                FROM anonymous_votes
+                                WHERE anonymous_votes.topic_id = topics.id
+                                AND anonymous_votes.stance = \'support\'
+                            ) +
+                            (
+                                SELECT COALESCE(COUNT(*), 0)
+                                FROM comments
+                                WHERE comments.topic_id = topics.id
+                            ) +
+                            (
+                                SELECT COALESCE(COUNT(DISTINCT user_id), 0) * 3
+                                FROM comments
+                                WHERE comments.topic_id = topics.id
                             )
-                            ->selectSub(
-                                function($query) {
-                                    $query->selectRaw('COUNT(*)')
-                                        ->from('anonymous_votes')
-                                        ->whereColumn('anonymous_votes.topic_id', 'topics.id')
-                                        ->where('stance', 'support');
-                                },
-                                'anon_support_votes'
-                            )
-                            ->selectSub(
-                                function($query) {
-                                    $query->selectRaw('COUNT(*)')
-                                        ->from('comments')
-                                        ->whereColumn('comments.topic_id', 'topics.id');
-                                },
-                                'comment_count'
-                            )
-                            ->selectSub(
-                                function($query) {
-                                    $query->selectRaw('COUNT(DISTINCT user_id)')
-                                        ->from('comments')
-                                        ->whereColumn('comments.topic_id', 'topics.id');
-                                },
-                                'unique_commenter_count'
-                            )
-                            ->selectRaw('
-                                COALESCE(topics.score, 0) + 
-                                COALESCE(auth_support_votes, 0) + 
-                                COALESCE(anon_support_votes, 0) + 
-                                COALESCE(comment_count, 0) + 
-                                (COALESCE(unique_commenter_count, 0) * 3) as popularity_score
-                            ')
-                            ->orderBy('popularity_score', 'desc');
+                        ) as popularity_score'))
+                        ->orderBy('popularity_score', 'desc');
                     } catch (\Exception $e) {
                         \Log::error('HomeController error: ' . $e->getMessage());
                         $query->orderBy('created_at', 'desc');
