@@ -41,47 +41,91 @@ class HomeController extends Controller
                             break;
                         }
 
-                        // 人気度計算：投票数 + コメント数 + ユニークコメント者数を考慮
-                        $query->withCount([
-                            'votes as total_votes',
-                            'comments as total_comments',
-                            'comments as unique_commenters' => function ($query) {
-                                $query->distinct('user_id');
-                            }
-                        ])
-                        ->selectRaw('
-                            topics.*,
-                            (
-                                COALESCE(topics.score, 0) + 
+                        // PostgreSQL対応のホットソート
+                        if (config('database.default') === 'pgsql') {
+                            $query->select('topics.*')
+                                ->selectRaw('
+                                    COALESCE(
+                                        (
+                                            SELECT COUNT(*)
+                                            FROM topic_votes
+                                            WHERE topic_votes.topic_id = topics.id
+                                            AND topic_votes.stance = \'support\'
+                                        ), 0
+                                    ) as support_votes,
+                                    COALESCE(
+                                        (
+                                            SELECT COUNT(*)
+                                            FROM anonymous_votes
+                                            WHERE anonymous_votes.topic_id = topics.id
+                                            AND anonymous_votes.stance = \'support\'
+                                        ), 0
+                                    ) as anon_support_votes,
+                                    COALESCE(
+                                        (
+                                            SELECT COUNT(*)
+                                            FROM comments
+                                            WHERE comments.topic_id = topics.id
+                                        ), 0
+                                    ) as comment_count,
+                                    COALESCE(
+                                        (
+                                            SELECT COUNT(DISTINCT user_id)
+                                            FROM comments
+                                            WHERE comments.topic_id = topics.id
+                                        ), 0
+                                    ) as unique_commenter_count
+                                ')
+                                ->selectRaw('
+                                    COALESCE(topics.score, 0) +
+                                    COALESCE(support_votes, 0) +
+                                    COALESCE(anon_support_votes, 0) +
+                                    COALESCE(comment_count, 0) +
+                                    (COALESCE(unique_commenter_count, 0) * 3) as popularity_score
+                                ')
+                                ->orderBy('popularity_score', 'desc');
+                        } else {
+                            // SQLite用のクエリ（既存のまま）
+                            $query->withCount([
+                                'votes as total_votes',
+                                'comments as total_comments',
+                                'comments as unique_commenters' => function ($query) {
+                                    $query->distinct('user_id');
+                                }
+                            ])
+                            ->selectRaw('
+                                topics.*,
                                 (
+                                    COALESCE(topics.score, 0) + 
+                                    (
+                                        COALESCE((
+                                            SELECT COUNT(*)
+                                            FROM topic_votes
+                                            WHERE topic_votes.topic_id = topics.id
+                                            AND topic_votes.stance = \'support\'
+                                        ), 0) +
+                                        COALESCE((
+                                            SELECT COUNT(*)
+                                            FROM anonymous_votes
+                                            WHERE anonymous_votes.topic_id = topics.id
+                                            AND anonymous_votes.stance = \'support\'
+                                        ), 0)
+                                    ) +
                                     COALESCE((
                                         SELECT COUNT(*)
-                                        FROM topic_votes
-                                        WHERE topic_votes.topic_id = topics.id
-                                        AND topic_votes.stance = \'support\'
-                                    ), 0) +
-                                    COALESCE((
-                                        SELECT COUNT(*)
-                                        FROM anonymous_votes
-                                        WHERE anonymous_votes.topic_id = topics.id
-                                        AND anonymous_votes.stance = \'support\'
-                                    ), 0)
-                                ) +
-                                COALESCE((
-                                    SELECT COUNT(*)
-                                    FROM comments
-                                    WHERE comments.topic_id = topics.id
-                                ), 0) +
-                                (
-                                    COALESCE((
-                                        SELECT COUNT(DISTINCT user_id)
                                         FROM comments
                                         WHERE comments.topic_id = topics.id
-                                    ), 0) * 3
-                                )
-                            ) as popularity_score
-                        ')
-                        ->orderBy('popularity_score', 'desc');
+                                    ), 0) +
+                                    (
+                                        COALESCE((
+                                            SELECT COUNT(DISTINCT user_id)
+                                            FROM comments
+                                            WHERE comments.topic_id = topics.id
+                                        ), 0) * 3
+                                    )
+                                ) as popularity_score
+                            ');
+                        }
                     } catch (\Exception $e) {
                         \Log::error('Error in hot sorting: ' . $e->getMessage());
                         // エラー時は作成日時でソート

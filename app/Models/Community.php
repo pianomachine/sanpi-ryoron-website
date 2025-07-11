@@ -45,6 +45,16 @@ class Community extends Model
             ->withTimestamps();
     }
 
+    public function comments()
+    {
+        return $this->hasManyThrough(
+            \App\Models\Comment::class,
+            \App\Models\Topic::class,
+            'community_id',
+            'topic_id'
+        );
+    }
+
     // アクセサー
     public function getMembersFormatted()
     {
