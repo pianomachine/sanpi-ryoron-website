@@ -40,6 +40,9 @@ export function useInfiniteScroll({
     const [newlyAddedItems, setNewlyAddedItems] = useState<Set<string | number>>(new Set());
     const [showingSkeleton, setShowingSkeleton] = useState(false);
     
+    // リクエストのキャンセル用
+    const abortControllerRef = useRef<AbortController | null>(null);
+    
     // 前回のパラメータを追跡
     const prevParamsRef = useRef(params);
     const prevUrlRef = useRef(url);
@@ -47,9 +50,25 @@ export function useInfiniteScroll({
     // 前回のデータサイズを追跡
     const previousDataSizeRef = useRef(initialData.length);
 
+    const isNearBottomRef = useRef(false);
+
+    // リクエストをキャンセルする関数
+    const cancelPreviousRequest = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+    };
+
     const loadMore = useCallback(async () => {
         if (loading || !hasMore || !enabled) return;
 
+        // 前のリクエストをキャンセル
+        cancelPreviousRequest();
+        
+        // 新しいAbortControllerを作成
+        abortControllerRef.current = new AbortController();
+        
         setLoading(true);
         setShowingSkeleton(true);
         setError(null);
@@ -59,43 +78,57 @@ export function useInfiniteScroll({
                 params: {
                     ...params,
                     page: currentPage + 1
-                }
+                },
+                signal: abortControllerRef.current.signal
             });
 
-            const newData = response.data.posts || [];
-            const responseHasMore = response.data.has_more || false;
-            const responseTotalCount = response.data.total_count || 0;
+            // リクエストがキャンセルされていない場合のみ状態を更新
+            if (!abortControllerRef.current.signal.aborted) {
+                const newData = response.data.posts || [];
+                const responseHasMore = response.data.has_more || false;
+                const responseTotalCount = response.data.total_count || 0;
 
-            // 新しく追加されるアイテムのIDを記録
-            const newItemIds = new Set<string | number>();
-            newData.forEach((item: any) => {
-                if (item.id) {
-                    newItemIds.add(item.id);
-                }
-            });
+                // 新しく追加されるアイテムのIDを記録
+                const newItemIds = new Set<string | number>();
+                newData.forEach((item: any) => {
+                    if (item.id) {
+                        newItemIds.add(item.id);
+                    }
+                });
 
-            setData(prevData => [...prevData, ...newData]);
-            setNewlyAddedItems(newItemIds);
-            setHasMore(responseHasMore);
-            setCurrentPage(prevPage => prevPage + 1);
-            setTotalCount(responseTotalCount);
-            
-            // アニメーション時間後にスケルトンを非表示
-            setTimeout(() => {
-                setShowingSkeleton(false);
-            }, 800);
-            
+                setData(prevData => [...prevData, ...newData]);
+                setNewlyAddedItems(newItemIds);
+                setHasMore(responseHasMore);
+                setCurrentPage(prevPage => prevPage + 1);
+                setTotalCount(responseTotalCount);
+                
+                // アニメーション時間後にスケルトンを非表示
+                setTimeout(() => {
+                    setShowingSkeleton(false);
+                }, 800);
+            }
         } catch (err: any) {
-            console.error('Failed to load more data:', err);
-            setError(err.response?.data?.error || 'データの読み込みに失敗しました');
-            setShowingSkeleton(false);
+            // AbortErrorは無視
+            if (err.name !== 'AbortError') {
+                console.error('Failed to load more data:', err);
+                setError(err.response?.data?.error || 'データの読み込みに失敗しました');
+                setShowingSkeleton(false);
+            }
         } finally {
-            setLoading(false);
+            if (!abortControllerRef.current?.signal.aborted) {
+                setLoading(false);
+            }
         }
     }, [url, params, currentPage, loading, hasMore, enabled]);
 
     const refresh = useCallback(async () => {
         if (loading) return;
+        
+        // 前のリクエストをキャンセル
+        cancelPreviousRequest();
+        
+        // 新しいAbortControllerを作成
+        abortControllerRef.current = new AbortController();
         
         setLoading(true);
         setError(null);
@@ -109,23 +142,32 @@ export function useInfiniteScroll({
                 params: {
                     ...params,
                     page: 1
-                }
+                },
+                signal: abortControllerRef.current.signal
             });
 
-            const newData = response.data.posts || [];
-            const responseHasMore = response.data.has_more || false;
-            const responseTotalCount = response.data.total_count || 0;
+            // リクエストがキャンセルされていない場合のみ状態を更新
+            if (!abortControllerRef.current.signal.aborted) {
+                const newData = response.data.posts || [];
+                const responseHasMore = response.data.has_more || false;
+                const responseTotalCount = response.data.total_count || 0;
 
-            setData(newData);
-            setHasMore(responseHasMore);
-            setCurrentPage(1);
-            setTotalCount(responseTotalCount);
-            previousDataSizeRef.current = newData.length;
+                setData(newData);
+                setHasMore(responseHasMore);
+                setCurrentPage(1);
+                setTotalCount(responseTotalCount);
+                previousDataSizeRef.current = newData.length;
+            }
         } catch (err: any) {
-            console.error('Failed to refresh data:', err);
-            setError(err.response?.data?.error || 'データの読み込みに失敗しました');
+            // AbortErrorは無視
+            if (err.name !== 'AbortError') {
+                console.error('Failed to refresh data:', err);
+                setError(err.response?.data?.error || 'データの読み込みに失敗しました');
+            }
         } finally {
-            setLoading(false);
+            if (!abortControllerRef.current?.signal.aborted) {
+                setLoading(false);
+            }
         }
     }, [url, params, loading]);
 
@@ -147,20 +189,30 @@ export function useInfiniteScroll({
     useEffect(() => {
         if (!enabled) return;
 
+        let scrollTimeout: NodeJS.Timeout;
+
         const handleScroll = () => {
             if (loading || !hasMore) return;
 
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollHeight = document.documentElement.scrollHeight;
-            const clientHeight = window.innerHeight;
+            clearTimeout(scrollTimeout);
 
-            if (scrollTop + clientHeight >= scrollHeight - threshold) {
-                loadMore();
-            }
+            scrollTimeout = setTimeout(() => {
+                const scrollingElement = document.scrollingElement || document.documentElement;
+                const { scrollTop, scrollHeight, clientHeight } = scrollingElement;
+                const newIsNearBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+
+                if (newIsNearBottom && !isNearBottomRef.current) {
+                    loadMore();
+                }
+                isNearBottomRef.current = newIsNearBottom;
+            }, 100);
         };
 
         window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            clearTimeout(scrollTimeout);
+        };
     }, [loadMore, loading, hasMore, threshold, enabled]);
 
     // パラメータが変更された時のリフレッシュ
@@ -174,6 +226,13 @@ export function useInfiniteScroll({
             refresh();
         }
     }, [url, params, enabled, refresh]);
+
+    // コンポーネントのアンマウント時にリクエストをキャンセル
+    useEffect(() => {
+        return () => {
+            cancelPreviousRequest();
+        };
+    }, []);
 
     return {
         data,

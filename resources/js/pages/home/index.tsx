@@ -81,8 +81,6 @@ export default function RedditHome({
     popular_posts_today,
     user 
 }: HomePageProps) {
-    // デバッグ用：trending_communitiesの内容を確認
-    console.log('trending_communities:', trending_communities);
     
     // 無限スクロールフック
     const { 
@@ -109,13 +107,14 @@ export default function RedditHome({
 
     // ソートが変更された時にリフレッシュ
     useEffect(() => {
-        if (!loading) {
-            refresh();
-        }
-    }, [current_sort, loading]);
+        refresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [current_sort]);
 
     // プレミアムプロモーションを挿入した投稿リストを生成
     const generatePostsWithAds = (posts: Post[]) => {
+        if (!posts || posts.length === 0) return [];
+        
         const result: Array<Post | { type: 'premium-ad', id: string }> = [];
         
         posts.forEach((post, index) => {

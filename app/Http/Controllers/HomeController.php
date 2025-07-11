@@ -710,11 +710,21 @@ class HomeController extends Controller
                     break;
             }
 
+            // 合計件数を先に取得
+            $totalCount = $query->count();
+
+            // ページネーション
             $topics = $query->limit($perPage)->offset($offset)->get();
-            
+
+            // データ変換処理
+            $posts = $topics->map(fn($topic) => $this->formatTopicForApi($topic));
+
             return response()->json([
-                'topics' => $topics,
-                'has_more' => $topics->count() === $perPage
+                'posts' => $posts->values(),
+                'has_more' => ($offset + $perPage) < $totalCount,
+                'current_page' => $page,
+                'total_pages' => ceil($totalCount / $perPage),
+                'total_count' => $totalCount
             ]);
 
         } catch (\Exception $e) {
