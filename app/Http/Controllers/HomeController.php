@@ -510,7 +510,7 @@ class HomeController extends Controller
                         'members' => $community->getMembersFormatted(),
                         'icon' => $community->icon,
                         'description' => $community->description,
-                        'slug' => $community->slug,
+                        'slug' => $community->slug ?? 'unknown',
                         'recent_activity' => $item['recent_activity']
                     ];
                 })
@@ -529,7 +529,7 @@ class HomeController extends Controller
                         'members' => $community->getMembersFormatted(),
                         'icon' => $community->icon,
                         'description' => $community->description,
-                        'slug' => $community->slug,
+                        'slug' => $community->slug ?? 'unknown',
                         'recent_activity' => [
                             'topics' => 0,
                             'comments' => 0,
@@ -612,7 +612,7 @@ class HomeController extends Controller
                         'id' => $topic->id,
                         'title' => $topic->title,
                         'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
-                        'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
+                        'subreddit_slug' => $topic->community ? ($topic->community->slug ?? 'unknown') : 'unknown',
                         'score' => $item['total_support_votes'], // 実際の賛成票数を表示
                         'comments_count' => $item['actual_comments_count'],
                         'unique_commenters' => $item['unique_commenters'],
@@ -809,54 +809,104 @@ class HomeController extends Controller
      */
     private function formatTopicForApi($topic)
     {
-        // 実際の投票数を計算
-        $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-            ->where('stance', 'support')
-            ->count();
-        $authOpposeVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-            ->where('stance', 'oppose')
-            ->count();
-            
-        $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
-            ->where('stance', 'support')
-            ->count();
-        $anonOpposeVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
-            ->where('stance', 'oppose')
-            ->count();
-            
-        $supportVotes = $authSupportVotes + $anonSupportVotes;
-        $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
+        try {
+            // 実際の投票数を計算（エラーハンドリング付き）
+            $authSupportVotes = 0;
+            $authOpposeVotes = 0;
+            $anonSupportVotes = 0;
+            $anonOpposeVotes = 0;
+            $commentsCount = 0;
 
-        // コメント数を計算
-        $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
-        
-        return [
-            'id' => $topic->id,
-            'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
-            'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
-            'subreddit_slug' => $topic->community ? $topic->community->slug : 'unknown',
-            'title' => $topic->title,
-            'content' => $topic->content ?? '',
-            'type' => $topic->type ?? 'text',
-            'author' => [
-                'username' => $topic->user ? $topic->user->name : 'Anonymous',
-                'karma' => 1000,
-                'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
-            ],
-            'votes' => [
-                'upvotes' => $supportVotes,
-                'downvotes' => $opposeVotes,
-                'score' => $supportVotes
-            ],
-            'comments_count' => $commentsCount,
-            'awards' => [],
-            'created_at' => $topic->created_at,
-            'url' => $topic->url,
-            'image_url' => $topic->image_url,
-            'is_nsfw' => $topic->is_nsfw ?? false,
-            'is_spoiler' => $topic->is_spoiler ?? false,
-            'flair' => $topic->flair,
-            'popularity_score' => $topic->popularity_score ?? 0
-        ];
+            try {
+                $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                    ->where('stance', 'support')
+                    ->count();
+                $authOpposeVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                    ->where('stance', 'oppose')
+                    ->count();
+            } catch (\Exception $e) {
+                \Log::warning('Failed to get TopicVote data: ' . $e->getMessage());
+            }
+
+            try {
+                $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+                    ->where('stance', 'support')
+                    ->count();
+                $anonOpposeVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+                    ->where('stance', 'oppose')
+                    ->count();
+            } catch (\Exception $e) {
+                \Log::warning('Failed to get AnonymousVote data: ' . $e->getMessage());
+            }
+
+            try {
+                $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
+            } catch (\Exception $e) {
+                \Log::warning('Failed to get Comment data: ' . $e->getMessage());
+            }
+            
+            $supportVotes = $authSupportVotes + $anonSupportVotes;
+            $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
+            
+            return [
+                'id' => $topic->id,
+                'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
+                'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
+                'subreddit_slug' => $topic->community ? ($topic->community->slug ?? 'unknown') : 'unknown',
+                'title' => $topic->title ?? 'No Title',
+                'content' => $topic->content ?? '',
+                'type' => $topic->type ?? 'text',
+                'author' => [
+                    'username' => $topic->user ? $topic->user->name : 'Anonymous',
+                    'karma' => 1000,
+                    'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
+                ],
+                'votes' => [
+                    'upvotes' => $supportVotes,
+                    'downvotes' => $opposeVotes,
+                    'score' => $supportVotes
+                ],
+                'comments_count' => $commentsCount,
+                'awards' => [],
+                'created_at' => $topic->created_at,
+                'url' => $topic->url ?? '',
+                'image_url' => $topic->image_url ?? '',
+                'is_nsfw' => $topic->is_nsfw ?? false,
+                'is_spoiler' => $topic->is_spoiler ?? false,
+                'flair' => $topic->flair ?? '',
+                'popularity_score' => $topic->popularity_score ?? 0
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Error in formatTopicForApi: ' . $e->getMessage());
+            // フォールバック: 最小限のデータを返す
+            return [
+                'id' => $topic->id ?? 0,
+                'subreddit' => 'Unknown',
+                'subreddit_icon' => '📝',
+                'subreddit_slug' => 'unknown',
+                'title' => $topic->title ?? 'No Title',
+                'content' => '',
+                'type' => 'text',
+                'author' => [
+                    'username' => 'Anonymous',
+                    'karma' => 1000,
+                    'cake_day' => date('Y-m-d')
+                ],
+                'votes' => [
+                    'upvotes' => 0,
+                    'downvotes' => 0,
+                    'score' => 0
+                ],
+                'comments_count' => 0,
+                'awards' => [],
+                'created_at' => $topic->created_at ?? now(),
+                'url' => '',
+                'image_url' => '',
+                'is_nsfw' => false,
+                'is_spoiler' => false,
+                'flair' => '',
+                'popularity_score' => 0
+            ];
+        }
     }
 }
