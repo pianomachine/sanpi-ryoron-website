@@ -265,7 +265,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                         <div className="lg:col-span-3">
                             {/* Create Post Button */}
                             <Card className="bg-white dark:bg-gray-800 mb-4">
-                                <CardContent className="p-6">
+                                <CardContent className="p-6 px-8">
                                     <div className="flex items-center space-x-3">
                                         <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
                                             <UserIcon className="w-4 h-4 text-gray-600 dark:text-gray-300" />
@@ -357,7 +357,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                                                 </div>
 
                                                 {/* Post Content */}
-                                                <div className="flex-1 p-3">
+                                                <div className="flex-1 p-3 px-6">
                                                     {/* Post Header */}
                                                     <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
                                                         <span>投稿者: {post.author.username}</span>
@@ -444,7 +444,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
 
                             {infinitePosts.length === 0 && !loading && (
                                 <Card className="bg-white dark:bg-gray-800">
-                                    <CardContent className="p-8 text-center">
+                                    <CardContent className="p-8 px-12 text-center">
                                         <div className="text-gray-400 dark:text-gray-500 mb-4">
                                             <MessageSquare className="w-16 h-16 mx-auto" />
                                         </div>
@@ -466,7 +466,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                                         <h3 className="font-semibold text-sm text-gray-900 dark:text-white">コミュニティについて</h3>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
+                                <CardContent className="space-y-3 px-6">
                                     <p className="text-xs text-gray-600 dark:text-gray-300">{community.description}</p>
                                     
                                     <div className="flex items-center justify-between text-xs">
@@ -504,7 +504,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                                 <CardHeader className="pb-3">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white">コミュニティルール</h3>
                                 </CardHeader>
-                                <CardContent className="space-y-2">
+                                <CardContent className="space-y-2 px-6">
                                     {community.rules.map((rule, index) => (
                                         <div key={index} className="text-xs text-gray-600 dark:text-gray-300">
                                             <span className="font-medium">{index + 1}. </span>
@@ -519,7 +519,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                                 <CardHeader className="pb-3">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white">モデレーター</h3>
                                 </CardHeader>
-                                <CardContent className="space-y-2">
+                                <CardContent className="space-y-2 px-6">
                                     {community.moderators.map((mod, index) => (
                                         <div key={index} className="flex items-center space-x-2 text-xs">
                                             <UserIcon className="w-3 h-3 text-gray-400 dark:text-gray-500" />

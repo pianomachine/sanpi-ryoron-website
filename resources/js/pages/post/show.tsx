@@ -1072,7 +1072,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                         <h3 className="font-semibold text-sm text-gray-900 dark:text-white">{community.name}</h3>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
+                                <CardContent className="space-y-3 px-6">
                                     <p className="text-xs text-gray-600 dark:text-gray-300">{community.description}</p>
                                     
                                     <div className="flex items-center justify-between text-xs">
@@ -1108,7 +1108,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                 <CardHeader className="pb-3">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white">コミュニティルール</h3>
                                 </CardHeader>
-                                <CardContent className="space-y-2">
+                                <CardContent className="space-y-2 px-6">
                                     {community.rules.map((rule, index) => (
                                         <div key={index} className="text-xs text-gray-600 dark:text-gray-300">
                                             <span className="font-medium">{index + 1}. </span>
@@ -1123,7 +1123,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                 <CardHeader className="pb-3">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white">モデレーター</h3>
                                 </CardHeader>
-                                <CardContent className="space-y-2">
+                                <CardContent className="space-y-2 px-6">
                                     {community.moderators.map((mod, index) => (
                                         <div key={index} className="flex items-center space-x-2 text-xs">
                                             <UserIcon className="w-3 h-3 text-gray-400 dark:text-gray-500" />
