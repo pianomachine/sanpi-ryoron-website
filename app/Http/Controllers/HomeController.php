@@ -788,6 +788,7 @@ class HomeController extends Controller
             return null;
         }
         
+        
         try {
             // キャッシュキーを生成
             $cacheKey = "topic_stats_{$topic->id}";
@@ -871,15 +872,6 @@ class HomeController extends Controller
                 'popularity_score' => $topic->popularity_score ?? 0
             ];
 
-            \Log::info('Formatted topic data: ' . json_encode([
-                'id' => $topic->id,
-                'title' => $topic->title,
-                'votes' => [
-                    'support' => $supportVotes,
-                    'oppose' => $opposeVotes
-                ],
-                'comments' => $commentsCount
-            ]));
 
             return $formatted;
         } catch (\Exception $e) {

@@ -84,9 +84,12 @@ export function useInfiniteScroll({
 
             // リクエストがキャンセルされていない場合のみ状態を更新
             if (!abortControllerRef.current.signal.aborted) {
-                const newData = response.data.posts || [];
+                const rawData = response.data.posts || [];
                 const responseHasMore = response.data.has_more || false;
                 const responseTotalCount = response.data.total_count || 0;
+
+                // nullアイテムをフィルタリング
+                const newData = rawData.filter((item: any) => item !== null && item !== undefined && item.id);
 
                 // 新しく追加されるアイテムのIDを記録
                 const newItemIds = new Set<string | number>();
@@ -148,9 +151,12 @@ export function useInfiniteScroll({
 
             // リクエストがキャンセルされていない場合のみ状態を更新
             if (!abortControllerRef.current.signal.aborted) {
-                const newData = response.data.posts || [];
+                const rawData = response.data.posts || [];
                 const responseHasMore = response.data.has_more || false;
                 const responseTotalCount = response.data.total_count || 0;
+
+                // nullアイテムをフィルタリング
+                const newData = rawData.filter((item: any) => item !== null && item !== undefined && item.id);
 
                 setData(newData);
                 setHasMore(responseHasMore);
