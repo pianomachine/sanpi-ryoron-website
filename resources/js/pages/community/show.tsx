@@ -357,7 +357,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                                                 </div>
 
                                                 {/* Post Content */}
-                                                <div className="flex-1 p-3 px-6">
+                                                <div className="flex-1 p-3 px-6 min-w-0">
                                                     {/* Post Header */}
                                                     <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
                                                         <span>投稿者: {post.author.username}</span>
@@ -375,14 +375,14 @@ export default function CommunityShow({ community, posts: initialPosts, current_
 
                                                     {/* Post Title */}
                                                     <Link href={`/post/${post.id}`}>
-                                                        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer break-words overflow-wrap-anywhere">
+                                                        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer break-words overflow-wrap-anywhere hyphens-auto max-w-full">
                                                             {post.title}
                                                         </h2>
                                                     </Link>
 
                                                     {/* Post Content */}
                                                     {post.content && (
-                                                        <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3 break-words overflow-wrap-anywhere">{post.content}</p>
+                                                        <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3 break-words overflow-wrap-anywhere hyphens-auto max-w-full">{post.content}</p>
                                                     )}
 
                                                     {/* Post Actions */}

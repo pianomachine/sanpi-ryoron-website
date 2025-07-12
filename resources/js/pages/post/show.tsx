@@ -489,8 +489,8 @@ export default function PostShow({ post, comments, community, voting_results, cu
                     {!isCollapsed && (
                         <>
                             {/* Comment Content */}
-                            <div className="mb-3 ml-10 mr-6">
-                                <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-line leading-relaxed break-words overflow-wrap-anywhere">{comment.content}</p>
+                            <div className="mb-3 ml-10 mr-6 min-w-0">
+                                <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-line leading-relaxed break-words overflow-wrap-anywhere hyphens-auto max-w-full">{comment.content}</p>
                             </div>
 
                             {/* Comment Actions */}
@@ -762,7 +762,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                     </div>
 
                                     {/* Post Content */}
-                                    <div className="flex-1 p-3 sm:p-4">
+                                    <div className="flex-1 p-3 sm:p-4 min-w-0">
                                         {/* Post Header */}
                                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-3">
                                             <span className="font-medium text-gray-900 dark:text-white">{post.subreddit}</span>
@@ -787,14 +787,14 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                         </div>
 
                                         {/* Post Title */}
-                                        <h1 className="text-xl font-medium text-gray-900 dark:text-white mb-4 break-words overflow-wrap-anywhere">
+                                        <h1 className="text-xl font-medium text-gray-900 dark:text-white mb-4 break-words overflow-wrap-anywhere hyphens-auto max-w-full">
                                             {post.title}
                                         </h1>
 
                                         {/* Post Content */}
                                         {post.content && (
                                             <div className="prose max-w-none mb-4">
-                                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed break-words overflow-wrap-anywhere">
+                                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed break-words overflow-wrap-anywhere hyphens-auto max-w-full">
                                                     {post.content}
                                                 </p>
                                             </div>
