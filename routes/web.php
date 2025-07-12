@@ -21,10 +21,24 @@ Route::get('/welcome', function () {
 Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/post/{id}', [HomeController::class, 'show'])->name('post.show');
 Route::get('/community/{slug}', [HomeController::class, 'community'])->name('community.show');
+Route::get('/search', function() {
+    $query = request('q', '');
+    $sort = request('sort', 'hot');
+    
+    return \Inertia\Inertia::render('search', [
+        'query' => $query,
+        'posts' => [],
+        'total_results' => 0,
+        'current_sort' => $sort
+    ]);
+})->name('search');
 
 // 無限スクロール用のAPIエンドポイントを追加
 Route::get('/api/posts', [HomeController::class, 'getPosts'])->name('api.posts');
 Route::get('/api/community/{slug}/posts', [HomeController::class, 'getCommunityPosts'])->name('api.community.posts');
+
+// 検索用APIエンドポイント
+Route::get('/api/search', [HomeController::class, 'search'])->name('api.search');
 
 // 投票機能（匿名投票対応）
 Route::post('/topics/{topic}/vote', [TopicController::class, 'voteTopic'])->name('topics.vote');

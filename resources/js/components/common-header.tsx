@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import TopicCreationModal from '@/components/topic-creation-modal';
+import SearchBar from '@/components/search-bar';
 import { 
     Home,
     TrendingUp,
@@ -66,6 +67,11 @@ export default function CommonHeader({ user }: CommonHeaderProps) {
         });
     };
 
+    const handleSearch = (query: string) => {
+        // 検索ページにリダイレクト
+        router.visit(`/search?q=${encodeURIComponent(query)}`);
+    };
+
     const isDarkMode = appearance === 'dark';
 
     return (
@@ -98,14 +104,11 @@ export default function CommonHeader({ user }: CommonHeaderProps) {
 
                     {/* Search Bar */}
                     <div className="flex-1 max-w-2xl mx-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
-                            <input
-                                type="text"
-                                placeholder="議題を検索"
-                                className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                            />
-                        </div>
+                        <SearchBar 
+                            onSearch={handleSearch}
+                            placeholder="議題を検索..."
+                            className="w-full flex justify-center"
+                        />
                     </div>
 
                     {/* User Menu */}

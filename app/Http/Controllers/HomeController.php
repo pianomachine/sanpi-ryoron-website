@@ -14,6 +14,105 @@ use Inertia\Inertia;
 
 class HomeController extends Controller
 {
+    public function search(Request $request)
+    {
+        try {
+            $query = $request->get('q', '');
+            $sort = $request->get('sort', 'hot');
+            $category = $request->get('category', ''); // フィルター追加
+            
+            if (empty($query)) {
+                return response()->json([
+                    'posts' => [],
+                    'message' => '検索クエリが必要です'
+                ], 400);
+            }
+            
+            // 議題の検索
+            $topicsQuery = Topic::with(['user', 'community'])
+                ->where('status', '=', 'active')
+                ->whereNotNull('community_id')
+                ->where(function($q) use ($query) {
+                    $q->where('title', 'LIKE', '%' . $query . '%')
+                      ->orWhere('content', 'LIKE', '%' . $query . '%');
+                });
+
+            // カテゴリフィルター
+            if (!empty($category)) {
+                $topicsQuery->whereHas('community', function($q) use ($category) {
+                    $q->where('slug', $category);
+                });
+            }
+
+            // ソート適用
+            switch ($sort) {
+                case 'new':
+                    $topicsQuery->orderBy('created_at', 'desc');
+                    break;
+                case 'top':
+                    $topicsQuery->orderBy('score', 'desc');
+                    break;
+                case 'hot':
+                    $topicsQuery->orderBy('hot_score', 'desc')
+                               ->orderBy('topics.id', 'desc');
+                    break;
+                case 'rising':
+                    $topicsQuery->where('created_at', '>=', now()->subHours(24))
+                               ->withCount(['votes as recent_votes', 'comments as recent_comments'])
+                               ->orderBy('recent_votes', 'desc')
+                               ->orderBy('recent_comments', 'desc');
+                    break;
+                default:
+                    $topicsQuery->orderBy('created_at', 'desc');
+                    break;
+            }
+
+            $topics = $topicsQuery->limit(50)->get(); // 検索結果を増加
+            
+            // データ変換
+            $posts = $topics->map(function ($topic) {
+                return $this->formatTopicForApi($topic);
+            })->filter(function($item) {
+                return $item !== null && !empty($item['type']);
+            });
+
+            // カテゴリ統計の取得
+            $categoryStats = Topic::with('community')
+                ->where('status', '=', 'active')
+                ->whereNotNull('community_id')
+                ->where(function($q) use ($query) {
+                    $q->where('title', 'LIKE', '%' . $query . '%')
+                      ->orWhere('content', 'LIKE', '%' . $query . '%');
+                })
+                ->get()
+                ->groupBy('community.slug')
+                ->map(function($group) {
+                    return [
+                        'name' => $group->first()->community->name,
+                        'slug' => $group->first()->community->slug,
+                        'count' => $group->count()
+                    ];
+                })
+                ->sortByDesc('count')
+                ->take(5)
+                ->values();
+            
+            return response()->json([
+                'posts' => $posts->values(),
+                'query' => $query,
+                'total_results' => $topics->count(),
+                'category_stats' => $categoryStats
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Search error: ' . $e->getMessage());
+            return response()->json([
+                'posts' => [],
+                'error' => '検索中にエラーが発生しました'
+            ], 500);
+        }
+    }
+
     public function index(Request $request)
     {
         try {
