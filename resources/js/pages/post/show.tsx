@@ -489,12 +489,12 @@ export default function PostShow({ post, comments, community, voting_results, cu
                     {!isCollapsed && (
                         <>
                             {/* Comment Content */}
-                            <div className="mb-3" style={{ marginLeft: '40px' }}>
+                            <div className="mb-3 ml-10">
                                 <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-line leading-relaxed">{comment.content}</p>
                             </div>
 
                             {/* Comment Actions */}
-                            <div className="flex items-center space-x-2 mb-3" style={{ marginLeft: '40px' }}>
+                            <div className="flex items-center space-x-2 mb-3 ml-10">
                                 <div className="flex items-center space-x-1">
                                     <Button
                                         variant="ghost"
@@ -556,7 +556,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
 
                             {/* Awards */}
                             {comment.awards && comment.awards.length > 0 && (
-                                <div className="flex items-center space-x-2 mb-3" style={{ marginLeft: '40px' }}>
+                                <div className="flex items-center space-x-2 mb-3 ml-10">
                                     {comment.awards.map((award, index) => {
                                         if (!award || !award.type) {
                                             console.warn('Invalid award object:', award);
@@ -573,8 +573,8 @@ export default function PostShow({ post, comments, community, voting_results, cu
 
                             {/* Reply Form */}
                             {replyingTo === comment.id && (
-                                <div className="mt-3" style={{ 
-                                    marginLeft: '40px', 
+                                <div className="mt-3 ml-10" style={{ 
+ 
                                     marginRight: `${Math.max(20, marginLeft + 40)}px` 
                                 }}>
                                     <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
@@ -625,7 +625,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
 
                             {/* Replies */}
                             {comment.replies.length > 0 && (
-                                <div className="mt-2" style={{ marginLeft: '40px' }}>
+                                <div className="mt-2 ml-10">
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -648,7 +648,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                     )}
 
                     {isCollapsed && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 italic" style={{ marginLeft: '40px' }}>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 italic ml-10">
                             コメントが折りたたまれています ({comment.replies.length > 0 ? `${comment.replies.length}件の返信` : '返信なし'})
                         </div>
                     )}
