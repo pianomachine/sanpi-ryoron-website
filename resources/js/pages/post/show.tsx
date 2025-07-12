@@ -1063,7 +1063,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                         </div>
 
                         {/* Sidebar */}
-                        <div className="space-y-4 order-2">
+                        <div className="hidden lg:block space-y-4 order-2">
                             {/* Community Info */}
                             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                                 <CardHeader className="pb-3">

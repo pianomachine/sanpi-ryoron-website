@@ -457,7 +457,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
                         </div>
 
                         {/* Sidebar */}
-                        <div className="space-y-4">
+                        <div className="hidden lg:block space-y-4">
                             {/* Community Info */}
                             <Card className="bg-white dark:bg-gray-800">
                                 <CardHeader className="pb-3">
