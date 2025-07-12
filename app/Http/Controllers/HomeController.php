@@ -9,6 +9,7 @@ use App\Models\Comment;
 use App\Models\CommunityMembership;
 use App\Models\AnonymousVote;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class HomeController extends Controller
