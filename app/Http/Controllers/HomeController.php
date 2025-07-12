@@ -48,10 +48,8 @@ class HomeController extends Controller
                               ->orderBy('hot_score','desc')
                               ->orderBy('topics.id','desc');
 
-                        \Log::info('Hot sort query: ' . $query->toSql());
-                        \Log::info('Hot sort bindings: ' . json_encode($query->getBindings()));
                     } catch (\Exception $e) {
-                        \Log::error('HomeController error: ' . $e->getMessage());
+                        \Log::error('HomeController hot sort error: ' . $e->getMessage());
                         $query->orderBy('created_at', 'desc');
                     }
                     break;
@@ -68,8 +66,6 @@ class HomeController extends Controller
             }
 
             $allTopics = $query->limit(20)->get();
-            \Log::info('Topics found: ' . $allTopics->count());
-            \Log::info('First topic data: ' . json_encode($allTopics->first()));
             
             // データが存在しない場合は空の状態を表示
             if ($allTopics->isEmpty()) {
