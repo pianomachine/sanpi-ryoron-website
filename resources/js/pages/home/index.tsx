@@ -242,7 +242,7 @@ export default function RedditHome({
                                 <CardHeader className="pb-3">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white">人気の議論カテゴリ</h3>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
+                                <CardContent className="space-y-3 px-6">
                                     {trending_communities.slice(0, 5).map((community, index) => {
                                         // slugが存在しない場合のフォールバック処理
                                         const communitySlug = community.slug || 'unknown';
@@ -293,7 +293,7 @@ export default function RedditHome({
                                     if (item.type === 'premium-ad') {
                                         return (
                                             <Card key={item.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700 shadow-sm infinite-scroll-item">
-                                                <CardContent className="p-6 text-center">
+                                                <CardContent className="p-6 px-8 text-center">
                                                     <div className="mb-4">
                                                         <div className="text-2xl mb-2">⭐</div>
                                                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
@@ -382,7 +382,7 @@ export default function RedditHome({
                                                 </div>
 
                                                 {/* Post Content */}
-                                                <div className={`flex-1 p-3 ${current_sort === 'hot' ? `transition-opacity duration-150 ${isTransitioning[post.id] ? 'opacity-30' : 'opacity-100'}` : ''}`}>
+                                                <div className={`flex-1 p-3 px-6 ${current_sort === 'hot' ? `transition-opacity duration-150 ${isTransitioning[post.id] ? 'opacity-30' : 'opacity-100'}` : ''}`}>
                                                     {/* Post Header */}
                                                     <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
                                                         <span className="font-medium text-gray-900 dark:text-white">{post.subreddit}</span>
@@ -530,7 +530,7 @@ export default function RedditHome({
                                 <CardHeader className="pb-3">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white">本日の人気議題</h3>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
+                                <CardContent className="space-y-3 px-6">
                                     {popular_posts_today.map((post, index) => (
                                         <Link key={index} href={`/post/${post.id}`} className="block">
                                             <div className="hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded cursor-pointer">
@@ -555,7 +555,7 @@ export default function RedditHome({
 
                             {/* Premium Ad */}
                             <Card className="bg-gradient-to-r from-blue-100 to-red-100 dark:from-blue-900/30 dark:to-red-900/30 border-gray-200 dark:border-gray-700">
-                                <CardContent className="p-4">
+                                <CardContent className="p-4 px-6">
                                     <div className="text-center">
                                         <h3 className="font-semibold text-sm mb-2 text-gray-900 dark:text-white">賛否両論.com プレミアム</h3>
                                         <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
