@@ -536,38 +536,71 @@ class HomeController extends Controller
             // 今日の投稿がない場合は過去3日間に拡張
             $searchStart = $todayTopics > 0 ? $todayStart : now()->subDays(3);
             
-            $topics = Topic::with(['community', 'user'])
-                ->where('created_at', '>=', $searchStart)
+            // トピックIDのみ取得して、後でバッチクエリを実行
+            $topicIds = Topic::where('created_at', '>=', $searchStart)
                 ->where('status', 'active')
+                ->pluck('id');
+            
+            // バッチでカウントを取得
+            $commentCounts = Comment::whereIn('topic_id', $topicIds)
+                ->groupBy('topic_id')
+                ->selectRaw('topic_id, COUNT(*) as count')
+                ->pluck('count', 'topic_id');
+            
+            $uniqueCommenterCounts = Comment::whereIn('topic_id', $topicIds)
+                ->groupBy('topic_id')
+                ->selectRaw('topic_id, COUNT(DISTINCT user_id) as count')
+                ->pluck('count', 'topic_id');
+            
+            $authVoteCounts = \App\Models\TopicVote::whereIn('topic_id', $topicIds)
+                ->groupBy('topic_id')
+                ->selectRaw('topic_id, COUNT(*) as count')
+                ->pluck('count', 'topic_id');
+            
+            $anonVoteCounts = AnonymousVote::whereIn('topic_id', $topicIds)
+                ->groupBy('topic_id')
+                ->selectRaw('topic_id, COUNT(*) as count')
+                ->pluck('count', 'topic_id');
+            
+            $authSupportVoteCounts = \App\Models\TopicVote::whereIn('topic_id', $topicIds)
+                ->where('stance', 'support')
+                ->groupBy('topic_id')
+                ->selectRaw('topic_id, COUNT(*) as count')
+                ->pluck('count', 'topic_id');
+            
+            $anonSupportVoteCounts = AnonymousVote::whereIn('topic_id', $topicIds)
+                ->where('stance', 'support')
+                ->groupBy('topic_id')
+                ->selectRaw('topic_id, COUNT(*) as count')
+                ->pluck('count', 'topic_id');
+            
+            // トピックを取得（関連データも含む）
+            $topics = Topic::with(['community', 'user'])
+                ->whereIn('id', $topicIds)
                 ->get();
             
             // PHPで人気度を計算
-            $topicsWithScore = $topics->map(function ($topic) {
-                // 実際のコメント数を取得
-                $actualCommentsCount = Comment::where('topic_id', $topic->id)->count();
+            $topicsWithScore = $topics->map(function ($topic) use (
+                $commentCounts, 
+                $uniqueCommenterCounts, 
+                $authVoteCounts, 
+                $anonVoteCounts,
+                $authSupportVoteCounts,
+                $anonSupportVoteCounts
+            ) {
+                $topicId = $topic->id;
                 
-                // ユニークコメンター数を取得（同じ人が何回コメントしても1人としてカウント）
-                $uniqueCommenters = Comment::where('topic_id', $topic->id)
-                    ->distinct('user_id')
-                    ->count('user_id');
-                
-                // 実際の投票数を取得（認証済み + 匿名）
-                $authVotes = \App\Models\TopicVote::where('topic_id', $topic->id)->count();
-                $anonVotes = AnonymousVote::where('topic_id', $topic->id)->count();
+                // 事前に取得したカウントを使用
+                $actualCommentsCount = $commentCounts->get($topicId, 0);
+                $uniqueCommenters = $uniqueCommenterCounts->get($topicId, 0);
+                $authVotes = $authVoteCounts->get($topicId, 0);
+                $anonVotes = $anonVoteCounts->get($topicId, 0);
                 $totalVotes = $authVotes + $anonVotes;
-                
-                // 賛成票のみを集計（認証済み + 匿名）
-                $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-                    ->where('stance', 'support')
-                    ->count();
-                $anonSupportVotes = AnonymousVote::where('topic_id', $topic->id)
-                    ->where('stance', 'support')
-                    ->count();
+                $authSupportVotes = $authSupportVoteCounts->get($topicId, 0);
+                $anonSupportVotes = $anonSupportVoteCounts->get($topicId, 0);
                 $totalSupportVotes = $authSupportVotes + $anonSupportVotes;
                 
                 // 改良された人気度スコア計算
-                // ベーススコア + (コメント数 × 1) + (ユニークコメンター数 × 3) + (投票数 × 1)
-                // ユニークコメンター数により高い重みを付けることで、同じ人の連続コメントを防ぐ
                 $popularityScore = ($topic->score ?? 0) + 
                                  ($actualCommentsCount * 1) + 
                                  ($uniqueCommenters * 3) + 
@@ -759,43 +792,58 @@ class HomeController extends Controller
     private function formatTopicForApi($topic)
     {
         try {
-            // 実際の投票数を計算（エラーハンドリング付き）
-            $authSupportVotes = 0;
-            $authOpposeVotes = 0;
-            $anonSupportVotes = 0;
-            $anonOpposeVotes = 0;
-            $commentsCount = 0;
-
-            try {
-                $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-                    ->where('stance', 'support')
-                    ->count();
-                $authOpposeVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
-                    ->where('stance', 'oppose')
-                    ->count();
-            } catch (\Exception $e) {
-                \Log::warning('Failed to get TopicVote data: ' . $e->getMessage());
-            }
-
-            try {
-                $anonSupportVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
-                    ->where('stance', 'support')
-                    ->count();
-                $anonOpposeVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
-                    ->where('stance', 'oppose')
-                    ->count();
-            } catch (\Exception $e) {
-                \Log::warning('Failed to get AnonymousVote data: ' . $e->getMessage());
-            }
-
-            try {
-                $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
-            } catch (\Exception $e) {
-                \Log::warning('Failed to get Comment data: ' . $e->getMessage());
-            }
+            // キャッシュキーを生成
+            $cacheKey = "topic_stats_{$topic->id}";
             
-            $supportVotes = $authSupportVotes + $anonSupportVotes;
-            $opposeVotes = $authOpposeVotes + $anonOpposeVotes;
+            // キャッシュから統計情報を取得（5分間キャッシュ）
+            $stats = Cache::remember($cacheKey, 300, function () use ($topic) {
+                $authSupportVotes = 0;
+                $authOpposeVotes = 0;
+                $anonSupportVotes = 0;
+                $anonOpposeVotes = 0;
+                $commentsCount = 0;
+
+                try {
+                    $authVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
+                        ->groupBy('stance')
+                        ->selectRaw('stance, COUNT(*) as count')
+                        ->pluck('count', 'stance');
+                    
+                    $authSupportVotes = $authVotes->get('support', 0);
+                    $authOpposeVotes = $authVotes->get('oppose', 0);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to get TopicVote data: ' . $e->getMessage());
+                }
+
+                try {
+                    $anonVotes = \App\Models\AnonymousVote::where('topic_id', $topic->id)
+                        ->groupBy('stance')
+                        ->selectRaw('stance, COUNT(*) as count')
+                        ->pluck('count', 'stance');
+                    
+                    $anonSupportVotes = $anonVotes->get('support', 0);
+                    $anonOpposeVotes = $anonVotes->get('oppose', 0);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to get AnonymousVote data: ' . $e->getMessage());
+                }
+
+                try {
+                    $commentsCount = \App\Models\Comment::where('topic_id', $topic->id)->count();
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to get Comment data: ' . $e->getMessage());
+                }
+                
+                return [
+                    'authSupportVotes' => $authSupportVotes,
+                    'authOpposeVotes' => $authOpposeVotes,
+                    'anonSupportVotes' => $anonSupportVotes,
+                    'anonOpposeVotes' => $anonOpposeVotes,
+                    'commentsCount' => $commentsCount
+                ];
+            });
+            
+            $supportVotes = $stats['authSupportVotes'] + $stats['anonSupportVotes'];
+            $opposeVotes = $stats['authOpposeVotes'] + $stats['anonOpposeVotes'];
 
             $formatted = [
                 'id' => $topic->id,
@@ -815,7 +863,7 @@ class HomeController extends Controller
                     'downvotes' => $opposeVotes,
                     'score' => $supportVotes
                 ],
-                'comments_count' => $commentsCount,
+                'comments_count' => $stats['commentsCount'],
                 'awards' => [],
                 'created_at' => $topic->created_at,
                 'url' => $topic->url ?? '',

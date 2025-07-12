@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Topic extends Model
 {
@@ -110,6 +111,35 @@ class Topic extends Model
         $this->update([
             'comments_count' => $this->comments()->count()
         ]);
+    }
+
+    public function updateCachedCounts(): void
+    {
+        $commentsCount = $this->comments()->count();
+        $uniqueCommenters = $this->comments()->distinct('user_id')->count('user_id');
+        
+        $authVotes = \App\Models\TopicVote::where('topic_id', $this->id)
+            ->groupBy('stance')
+            ->selectRaw('stance, COUNT(*) as count')
+            ->pluck('count', 'stance');
+        
+        $anonVotes = \App\Models\AnonymousVote::where('topic_id', $this->id)
+            ->groupBy('stance')
+            ->selectRaw('stance, COUNT(*) as count')
+            ->pluck('count', 'stance');
+        
+        $this->update([
+            'cached_comments_count' => $commentsCount,
+            'cached_unique_commenters' => $uniqueCommenters,
+            'cached_support_votes' => $authVotes->get('support', 0),
+            'cached_oppose_votes' => $authVotes->get('oppose', 0),
+            'cached_anonymous_support_votes' => $anonVotes->get('support', 0),
+            'cached_anonymous_oppose_votes' => $anonVotes->get('oppose', 0),
+            'counts_updated_at' => now()
+        ]);
+        
+        // キャッシュをクリア
+        Cache::forget("topic_stats_{$this->id}");
     }
 
     public function updateVoteScore(): void
