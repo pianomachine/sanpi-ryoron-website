@@ -87,7 +87,9 @@ class HomeController extends Controller
                     'popularity_score' => $topic->popularity_score
                 ]));
                 return $formattedTopic;
-            })->filter();  // nullを除外
+            })->filter(function($item) {
+                return $item !== null && !empty($item['type']);
+            });  // nullと不正なデータを除外
             
             // サイドバーデータの取得
             $trending_communities = [];
@@ -792,6 +794,11 @@ class HomeController extends Controller
      */
     private function formatTopicForApi($topic)
     {
+        if (!$topic) {
+            \Log::warning('formatTopicForApi called with null topic');
+            return null;
+        }
+        
         try {
             // キャッシュキーを生成
             $cacheKey = "topic_stats_{$topic->id}";
@@ -848,14 +855,14 @@ class HomeController extends Controller
 
             $formatted = [
                 'id' => $topic->id,
-                'subreddit' => $topic->community ? $topic->community->name : 'Unknown',
-                'subreddit_icon' => $topic->community ? $topic->community->icon : '📝',
-                'subreddit_slug' => $topic->community ? ($topic->community->slug ?? 'unknown') : 'unknown',
-                'title' => $topic->title ?? 'No Title',
+                'subreddit' => ($topic->community && !empty($topic->community->name)) ? $topic->community->name : 'Unknown',
+                'subreddit_icon' => ($topic->community && !empty($topic->community->icon)) ? $topic->community->icon : '📝',
+                'subreddit_slug' => ($topic->community && !empty($topic->community->slug)) ? $topic->community->slug : 'unknown',
+                'title' => !empty($topic->title) ? $topic->title : 'No Title',
                 'content' => $topic->content ?? '',
-                'type' => $topic->type ?? 'text',
+                'type' => (!empty($topic->type) && in_array($topic->type, ['text', 'link', 'image', 'video'])) ? $topic->type : 'text',
                 'author' => [
-                    'username' => $topic->user ? $topic->user->name : 'Anonymous',
+                    'username' => ($topic->user && !empty($topic->user->name)) ? $topic->user->name : 'Anonymous',
                     'karma' => 1000,
                     'cake_day' => $topic->user ? $topic->user->created_at->format('Y-m-d') : date('Y-m-d')
                 ],
@@ -887,7 +894,10 @@ class HomeController extends Controller
 
             return $formatted;
         } catch (\Exception $e) {
-            \Log::error('Error in formatTopicForApi: ' . $e->getMessage());
+            \Log::error('Error in formatTopicForApi: ' . $e->getMessage(), [
+                'topic_id' => $topic->id ?? 'unknown',
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
     }
