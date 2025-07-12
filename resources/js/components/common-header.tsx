@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import TopicCreationModal from '@/components/topic-creation-modal';
-import SearchBar from '@/components/search-bar';
 import { 
     Home,
     TrendingUp,
@@ -77,18 +76,18 @@ export default function CommonHeader({ user }: CommonHeaderProps) {
     return (
         <>
             <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-2 sm:px-4">
-                    <div className="flex items-center justify-between h-12 sm:h-14">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex items-center justify-between h-12">
                     {/* Logo and Navigation */}
-                    <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-                        <Link href="/home" className="flex items-center space-x-1 sm:space-x-2">
-                            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-blue-500 to-red-500 rounded-full flex items-center justify-center">
-                                <span className="text-white font-bold text-[10px] sm:text-xs">賛否</span>
+                    <div className="flex items-center space-x-4">
+                        <Link href="/home" className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-red-500 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold text-xs">賛否</span>
                             </div>
-                            <span className="font-bold text-sm sm:text-xl hidden sm:block text-gray-900 dark:text-white">賛否両論.com</span>
+                            <span className="font-bold text-xl hidden sm:block text-gray-900 dark:text-white">賛否両論.com</span>
                         </Link>
                         
-                        <nav className="hidden lg:flex items-center space-x-1">
+                        <nav className="hidden md:flex items-center space-x-1">
                             <Button variant="ghost" size="sm" className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" asChild>
                                 <Link href="/home">
                                     <Home className="w-4 h-4" />
@@ -103,21 +102,32 @@ export default function CommonHeader({ user }: CommonHeaderProps) {
                     </div>
 
                     {/* Search Bar */}
-                    <div className="flex-1 max-w-2xl mx-2 sm:mx-4">
-                        <SearchBar 
-                            onSearch={handleSearch}
-                            placeholder="議題を検索..."
-                            className="w-full flex justify-center"
-                        />
+                    <div className="flex-1 max-w-2xl mx-4">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
+                            <input
+                                type="text"
+                                placeholder="議題を検索"
+                                className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const target = e.target as HTMLInputElement;
+                                        if (target.value.trim()) {
+                                            handleSearch(target.value.trim());
+                                        }
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
 
                     {/* User Menu */}
-                    <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                    <div className="flex items-center space-x-2">
                         <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={handleTopicCreate}
-                            className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 p-1 sm:p-2"
+                            className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                             title="議題を投稿"
                         >
                             <Plus className="w-4 h-4" />
@@ -183,18 +193,12 @@ export default function CommonHeader({ user }: CommonHeaderProps) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ) : (
-                            <div className="flex space-x-1 sm:space-x-2">
-                                <Button variant="outline" size="sm" className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs sm:text-sm px-2 sm:px-3" asChild>
-                                    <Link href={getLoginUrlWithRedirect(currentUrl)}>
-                                        <span className="hidden sm:inline">ログイン</span>
-                                        <span className="sm:hidden">Login</span>
-                                    </Link>
+                            <div className="flex space-x-2">
+                                <Button variant="outline" size="sm" className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800" asChild>
+                                    <Link href={getLoginUrlWithRedirect(currentUrl)}>ログイン</Link>
                                 </Button>
-                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-2 sm:px-3" asChild>
-                                    <Link href={getLoginUrlWithRedirect(currentUrl)}>
-                                        <span className="hidden sm:inline">アカウント作成</span>
-                                        <span className="sm:hidden">Sign up</span>
-                                    </Link>
+                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" asChild>
+                                    <Link href={getLoginUrlWithRedirect(currentUrl)}>アカウント作成</Link>
                                 </Button>
                             </div>
                         )}
