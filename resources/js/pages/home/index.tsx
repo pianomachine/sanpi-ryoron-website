@@ -284,6 +284,12 @@ export default function RedditHome({
                             {/* Posts */}
                             <div className="space-y-3">
                                 {postsWithAds.map((item, index) => {
+                                    // Null safety check
+                                    if (!item || typeof item !== 'object') {
+                                        console.warn('Invalid item in postsWithAds:', item);
+                                        return null;
+                                    }
+                                    
                                     if (item.type === 'premium-ad') {
                                         return (
                                             <Card key={item.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700 shadow-sm infinite-scroll-item">
@@ -305,6 +311,13 @@ export default function RedditHome({
                                         );
                                     }
                                     const post = item as Post;
+                                    
+                                    // Validate post object
+                                    if (!post || !post.id || !post.title || !post.type) {
+                                        console.warn('Invalid post object:', post);
+                                        return null;
+                                    }
+                                    
                                     const postIsNew = isItemNew(post.id);
                                     return (
                                         <Card 

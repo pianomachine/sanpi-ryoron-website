@@ -555,13 +555,19 @@ export default function PostShow({ post, comments, community, voting_results, cu
                             </div>
 
                             {/* Awards */}
-                            {comment.awards.length > 0 && (
+                            {comment.awards && comment.awards.length > 0 && (
                                 <div className="flex items-center space-x-2 mb-3" style={{ marginLeft: '40px' }}>
-                                    {comment.awards.map((award, index) => (
-                                        <Badge key={index} variant="outline" className="text-xs">
-                                            {award.type} {award.count}
-                                        </Badge>
-                                    ))}
+                                    {comment.awards.map((award, index) => {
+                                        if (!award || !award.type) {
+                                            console.warn('Invalid award object:', award);
+                                            return null;
+                                        }
+                                        return (
+                                            <Badge key={index} variant="outline" className="text-xs">
+                                                {award.type} {award.count}
+                                            </Badge>
+                                        );
+                                    })}
                                 </div>
                             )}
 
@@ -806,13 +812,19 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                         )}
 
                                         {/* Awards */}
-                                        {post.awards.length > 0 && (
+                                        {post.awards && post.awards.length > 0 && (
                                             <div className="flex items-center space-x-2 mb-4">
-                                                {post.awards.map((award, index) => (
-                                                    <Badge key={index} variant="outline" className="text-xs">
-                                                        {award.type} {award.count}
-                                                    </Badge>
-                                                ))}
+                                                {post.awards.map((award, index) => {
+                                                    if (!award || !award.type) {
+                                                        console.warn('Invalid award object:', award);
+                                                        return null;
+                                                    }
+                                                    return (
+                                                        <Badge key={index} variant="outline" className="text-xs">
+                                                            {award.type} {award.count}
+                                                        </Badge>
+                                                    );
+                                                })}
                                             </div>
                                         )}
 
