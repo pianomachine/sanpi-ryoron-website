@@ -79,14 +79,7 @@ class HomeController extends Controller
             
             // データ変換処理（プレミアムプロモーション無し）
             $posts = $allTopics->map(function ($topic) {
-                $formattedTopic = $this->formatTopicForApi($topic);
-                \Log::info('Formatted topic: ' . json_encode([
-                    'id' => $topic->id,
-                    'title' => $topic->title,
-                    'community' => $topic->community ? $topic->community->name : 'Unknown',
-                    'popularity_score' => $topic->popularity_score
-                ]));
-                return $formattedTopic;
+                return $this->formatTopicForApi($topic);
             })->filter(function($item) {
                 return $item !== null && !empty($item['type']);
             });  // nullと不正なデータを除外
