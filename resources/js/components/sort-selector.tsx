@@ -26,10 +26,10 @@ export default function SortSelector({ currentSort, onSortChange }: SortSelector
   };
 
   const sortOptions = [
-    { value: 'hot', label: '🔥人気', icon: Flame },
-    { value: 'new', label: '🆕最新', icon: Clock },
-    { value: 'top', label: '⭐殿堂', icon: Star },
-    { value: 'rising', label: '📈上昇中', icon: TrendingUp },
+    { value: 'hot', label: '人気', icon: Flame },
+    { value: 'new', label: '最新', icon: Clock },
+    { value: 'top', label: '殿堂', icon: Star },
+    { value: 'rising', label: '上昇中', icon: TrendingUp },
   ];
 
   return (
@@ -50,6 +50,7 @@ export default function SortSelector({ currentSort, onSortChange }: SortSelector
               )}
             >
               <span className="flex items-center gap-1">
+                <option.icon className="h-3.5 w-3.5" />
                 {option.label}
               </span>
               <RadioGroupItem
@@ -79,6 +80,12 @@ export default function SortSelector({ currentSort, onSortChange }: SortSelector
             </label>
           ))}
         </RadioGroup>
+      </div>
+      <div className="mt-4 p-4 bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 rounded-lg border border-primary/10">
+        <h3 className="font-semibold text-sm mb-2 text-gray-900 dark:text-white">賛否両論.com プレミアム</h3>
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          プレミアム会員になると、広告非表示、高度な分析機能、カスタムテーマなどの特典が利用できます。
+        </p>
       </div>
     </div>
   );
