@@ -145,6 +145,13 @@ class TopicController extends Controller
      */
     public function vote(Request $request, Comment $comment)
     {
+        if (!auth()->check()) {
+            return response()->json([
+                'success' => false,
+                'message' => '評価するにはログインが必要です'
+            ], 401);
+        }
+
         $validated = $request->validate([
             'vote_type' => 'required|in:like,dislike',
         ]);
@@ -172,8 +179,18 @@ class TopicController extends Controller
         }
 
         $comment->updateVotesCount();
+        
+        // リフレッシュしてデータベースから最新の投票数を取得
+        $comment->refresh();
 
-        return back();
+        return response()->json([
+            'success' => true,
+            'message' => '評価しました',
+            'upvotes' => $comment->upvotes,
+            'downvotes' => $comment->downvotes,
+            'score' => $comment->score,
+            'votes_count' => $comment->votes_count
+        ]);
     }
 
     /**

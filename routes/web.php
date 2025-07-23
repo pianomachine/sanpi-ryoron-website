@@ -70,6 +70,9 @@ Route::middleware([
     // コメント機能
     Route::post('/posts/{id}/comments', [HomeController::class, 'storeComment'])->name('posts.comments.store');
     
+    // コメント評価機能
+    Route::post('/comments/{comment}/vote', [TopicController::class, 'vote'])->name('comments.vote');
+    
     // 議題の保存・削除機能
     Route::post('/topics/{topic}/save', [TopicController::class, 'saveTopic'])->name('topics.save');
     Route::delete('/topics/{topic}/save', [TopicController::class, 'unsaveTopic'])->name('topics.unsave');

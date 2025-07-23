@@ -158,14 +158,85 @@ export default function PostShow({ post, comments, community, voting_results, cu
         }
     };
 
-    const handleVote = (itemId: number, voteType: 'up' | 'down', isComment = false) => {
-        if (isComment) {
-            setVotedComments(prev => ({
-                ...prev,
-                [itemId]: prev[itemId] === voteType ? null : voteType
-            }));
+    const handleVote = async (itemId: number, voteType: 'up' | 'down', isComment = false) => {
+        if (!user) {
+            alert('評価するにはログインが必要です。');
+            return;
         }
-        // Post voting functionality can be implemented here if needed
+
+        if (isComment) {
+            try {
+                const response = await fetch(`/comments/${itemId}/vote`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                    body: JSON.stringify({
+                        vote_type: voteType === 'up' ? 'like' : 'dislike'
+                    }),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    setVotedComments(prev => ({
+                        ...prev,
+                        [itemId]: prev[itemId] === voteType ? null : voteType
+                    }));
+                    
+                    // Update comment data with new vote counts (includes nested replies)
+                    setAllComments(prev => prev.map(comment => {
+                        if (comment.id === itemId) {
+                            return {
+                                ...comment,
+                                votes: {
+                                    upvotes: result.upvotes || comment.votes.upvotes,
+                                    downvotes: result.downvotes || comment.votes.downvotes,
+                                    score: result.score || comment.votes.score
+                                }
+                            };
+                        }
+                        
+                        // Check if it's a reply
+                        if (comment.replies && comment.replies.length > 0) {
+                            const updatedReplies = comment.replies.map(reply => 
+                                reply.id === itemId 
+                                    ? {
+                                        ...reply,
+                                        votes: {
+                                            upvotes: result.upvotes || reply.votes.upvotes,
+                                            downvotes: result.downvotes || reply.votes.downvotes,
+                                            score: result.score || reply.votes.score
+                                        }
+                                    }
+                                    : reply
+                            );
+                            
+                            return { ...comment, replies: updatedReplies };
+                        }
+                        
+                        return comment;
+                    }));
+                    
+                    showNotification(result.message || '評価しました');
+                } else {
+                    let errorMessage = '評価に失敗しました';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorMessage;
+                    } catch (parseError) {
+                        console.error('Failed to parse error response:', parseError);
+                        if (response.status === 401) {
+                            errorMessage = '評価するにはログインが必要です';
+                        }
+                    }
+                    showNotification(errorMessage, 'error');
+                }
+            } catch (error) {
+                console.error('Vote error:', error);
+                showNotification('評価に失敗しました', 'error');
+            }
+        }
     };
 
     const toggleComment = (commentId: number) => {
@@ -765,7 +836,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                     <div className="flex-1 p-3 sm:p-4 min-w-0">
                                         {/* Post Header */}
                                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-3">
-                                            <span className="font-medium text-gray-900 dark:text-white">{post.subreddit}</span>
+                                            <Link href={`/community/${community.slug}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{post.subreddit}</Link>
                                             <span className="hidden sm:inline">•</span>
                                             <span className="text-xs sm:text-sm">投稿者: {post.author.username}</span>
                                             <span className="hidden sm:inline">•</span>

@@ -102,8 +102,10 @@ class Comment extends Model
         $dislikesCount = $this->dislikes()->count();
         
         $this->update([
-            'votes_count' => $likesCount - $dislikesCount,
-            'score' => $this->upvotes - $this->downvotes
+            'upvotes' => $likesCount,
+            'downvotes' => $dislikesCount,
+            'votes_count' => $likesCount + $dislikesCount,
+            'score' => $likesCount - $dislikesCount
         ]);
     }
 
