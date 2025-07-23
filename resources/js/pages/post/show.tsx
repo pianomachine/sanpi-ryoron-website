@@ -566,7 +566,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
 
                             {/* Comment Actions */}
                             <div className="flex items-center space-x-2 mb-3 ml-10 mr-6">
-                                <div className="flex items-center space-x-1">
+                                <div className="flex items-center space-x-2">
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -580,15 +580,15 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                         <ArrowUp className="w-4 h-4" />
                                     </Button>
                                     <span className={`text-xs font-medium min-w-[20px] text-center ${
-                                        votedComments[comment.id] === 'up' ? 'text-orange-500' : 
-                                        votedComments[comment.id] === 'down' ? 'text-blue-500' : 'text-gray-700 dark:text-gray-300'
+                                        votedComments[comment.id] === 'up' ? 'text-orange-500' : 'text-gray-700 dark:text-gray-300'
                                     }`}>
-                                        {formatScore(comment.votes.score)}
+                                        {formatScore(comment.votes.upvotes)}
                                     </span>
+                                    {/* 低評価ボタン - 将来のProユーザー向け機能として非表示 */}
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className={`p-1 h-auto ${
+                                        className={`p-1 h-auto hidden ${
                                             votedComments[comment.id] === 'down' ? 'text-blue-500' : 'text-gray-400 hover:text-blue-500'
                                         } ${!user ? 'cursor-not-allowed opacity-50' : ''}`}
                                         onClick={() => user && handleVote(comment.id, 'down', true)}
