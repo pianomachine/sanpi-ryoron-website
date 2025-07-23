@@ -8,6 +8,7 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { SkeletonLoader, LoadingSeparator } from '@/components/skeleton-loader';
 import SortSelector from '@/components/sort-selector';
 import CommonHeader from '@/components/common-header';
+import { LinkPreviews } from '@/components/link-preview';
 import { 
     ArrowUp, 
     ArrowDown, 
@@ -44,6 +45,15 @@ interface Post {
     created_at: string;
     url?: string;
     image_url?: string;
+    link_previews?: Array<{
+        url: string;
+        title: string;
+        description?: string;
+        image?: string;
+        domain: string;
+        site_name?: string;
+        position: number;
+    }>;
     is_nsfw: boolean;
     is_spoiler: boolean;
     flair?: string;
@@ -410,6 +420,13 @@ export default function RedditHome({
                                                     {/* Post Content */}
                                                     {post.content && (
                                                         <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 line-clamp-3 break-words overflow-wrap-anywhere hyphens-auto max-w-full">{post.content}</p>
+                                                    )}
+
+                                                    {/* Link Previews */}
+                                                    {post.link_previews && post.link_previews.length > 0 && (
+                                                        <div className="mb-3">
+                                                            <LinkPreviews previews={post.link_previews.slice(0, 1)} />
+                                                        </div>
                                                     )}
 
                                                     {/* Post Image */}

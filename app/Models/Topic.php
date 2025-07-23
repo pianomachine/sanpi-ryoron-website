@@ -28,6 +28,7 @@ class Topic extends Model
         'status',
         'views_count',
         'comments_count',
+        'link_previews',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Topic extends Model
         'is_nsfw' => 'boolean',
         'is_spoiler' => 'boolean',
         'awards' => 'array',
+        'link_previews' => 'array',
     ];
 
     // リレーションシップ

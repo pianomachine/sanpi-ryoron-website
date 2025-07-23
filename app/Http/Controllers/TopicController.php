@@ -6,6 +6,7 @@ use App\Models\Comment;
 use App\Models\Topic;
 use App\Models\Vote;
 use App\Models\AnonymousVote;
+use App\Services\LinkPreviewService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -91,6 +92,10 @@ class TopicController extends Controller
             'flair' => 'nullable|string|max:50',
         ]);
 
+        // リンクプレビューを生成
+        $linkPreviewService = new LinkPreviewService();
+        $linkPreviews = $linkPreviewService->extractLinksFromContent($validated['content']);
+
         // 議題を作成
         $topic = Topic::create([
             'title' => $validated['title'],
@@ -105,6 +110,7 @@ class TopicController extends Controller
             'score' => 0,
             'views_count' => 0,
             'is_nsfw' => false,
+            'link_previews' => $linkPreviews,
             'is_spoiler' => false,
         ]);
 

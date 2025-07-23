@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { type User } from '@/types';
 import CommonHeader from '@/components/common-header';
+import { LinkPreviews } from '@/components/link-preview';
 import { 
     ArrowUp, 
     ArrowDown, 
@@ -68,6 +69,15 @@ interface Post {
     created_at: string;
     url?: string;
     image_url?: string;
+    link_previews?: Array<{
+        url: string;
+        title: string;
+        description?: string;
+        image?: string;
+        domain: string;
+        site_name?: string;
+        position: number;
+    }>;
     is_nsfw: boolean;
     is_spoiler: boolean;
     flair?: string;
@@ -868,6 +878,13 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                                 <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed break-words overflow-wrap-anywhere hyphens-auto max-w-full">
                                                     {post.content}
                                                 </p>
+                                            </div>
+                                        )}
+
+                                        {/* Link Previews */}
+                                        {post.link_previews && post.link_previews.length > 0 && (
+                                            <div className="mb-4">
+                                                <LinkPreviews previews={post.link_previews} />
                                             </div>
                                         )}
 
