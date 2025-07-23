@@ -524,7 +524,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
 
         return (
             <div key={comment.id} className="border-l border-gray-200 dark:border-gray-700" style={{ marginLeft: `${marginLeft}px` }}>
-                <div className="pl-4 py-2 relative">
+                <div className="pl-4 pt-4 pb-2 relative">
                     {/* Comment Header */}
                     <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
                         <Button
@@ -1099,7 +1099,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                             {/* Comments */}
                             <div className="relative">
                                 <Card className="bg-white dark:bg-gray-800">
-                                    <CardContent className={`${allComments.length === 0 ? 'p-12' : 'p-0'}`}>
+                                    <CardContent className={`${allComments.length === 0 ? 'p-12' : 'pt-2 pb-0 px-0'}`}>
                                         {allComments.length > 0 ? (
                                             allComments.map(comment => renderComment(comment))
                                         ) : (
