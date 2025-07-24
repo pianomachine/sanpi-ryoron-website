@@ -238,7 +238,26 @@ export default function RedditHome({
 
     return (
         <>
-            <Head title="賛否両論.com - ホーム" />
+            <Head title="賛否両論.com - ホーム">
+                {/* Open Graph / Facebook */}
+                <meta property="og:type" content="website" />
+                <meta property="og:title" content="賛否両論.com - みんなで議論しよう" />
+                <meta property="og:description" content="様々な話題について建設的な議論ができるプラットフォーム。賛成・反対の意見を交換して、多角的な視点を得よう。" />
+                <meta property="og:url" content={window.location.origin} />
+                <meta property="og:site_name" content="賛否両論.com" />
+                <meta property="og:locale" content="ja_JP" />
+                <meta property="og:image" content={`${window.location.origin}/images/default-og-image.png`} />
+                
+                {/* Twitter Card */}
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:title" content="賛否両論.com - みんなで議論しよう" />
+                <meta name="twitter:description" content="様々な話題について建設的な議論ができるプラットフォーム。賛成・反対の意見を交換して、多角的な視点を得よう。" />
+                <meta name="twitter:image" content={`${window.location.origin}/images/default-og-image.png`} />
+                
+                {/* Basic SEO */}
+                <meta name="description" content="様々な話題について建設的な議論ができるプラットフォーム。賛成・反対の意見を交換して、多角的な視点を得よう。" />
+                <meta name="keywords" content="議論, 賛否両論, ディスカッション, 意見交換, フォーラム" />
+            </Head>
             
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                 <CommonHeader user={user} />
