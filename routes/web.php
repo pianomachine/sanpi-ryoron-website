@@ -244,6 +244,7 @@ Route::get('/admin/link-preview-status', function () {
         // 最新の議題を1件取得してテスト
         $latestTopic = \App\Models\Topic::latest()->first();
         $testPreview = null;
+        $directUrlTest = null;
         
         if ($latestTopic && $latestTopic->content) {
             try {
@@ -254,12 +255,22 @@ Route::get('/admin/link-preview-status', function () {
             }
         }
         
+        // 直接URLでテスト
+        try {
+            $linkPreviewService = new \App\Services\LinkPreviewService();
+            $testContent = "これはテストです。https://github.com のリンクがあります。";
+            $directUrlTest = $linkPreviewService->extractLinksFromContent($testContent);
+        } catch (\Exception $e) {
+            $directUrlTest = 'Error: ' . $e->getMessage();
+        }
+        
         return response()->json([
             'link_previews_column_exists' => $hasColumn,
             'topics_with_previews' => $topicsWithPreviews,
             'latest_topic_id' => $latestTopic ? $latestTopic->id : null,
             'latest_topic_content' => $latestTopic ? substr($latestTopic->content, 0, 200) : null,
             'test_preview_result' => $testPreview,
+            'direct_url_test' => $directUrlTest,
             'timestamp' => now()->toDateTimeString()
         ]);
     } catch (\Exception $e) {
