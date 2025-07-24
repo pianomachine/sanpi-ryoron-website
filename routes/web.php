@@ -237,7 +237,7 @@ Route::get('/admin/link-preview-status', function () {
         $topicsWithPreviews = 0;
         if ($hasColumn) {
             $topicsWithPreviews = \App\Models\Topic::whereNotNull('link_previews')
-                ->where('link_previews', '!=', '[]')
+                ->whereRaw("CAST(link_previews AS TEXT) != '[]'")
                 ->count();
         }
         
