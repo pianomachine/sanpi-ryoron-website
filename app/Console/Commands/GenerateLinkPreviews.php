@@ -42,11 +42,11 @@ class GenerateLinkPreviews extends Command
             return 0;
         }
         
-        // 全ての議題を処理
-        $topics = Topic::whereNull('link_previews')
-            ->orWhere('link_previews', '[]')
-            ->where('status', 'active')
-            ->get();
+        // 全ての議題を処理 (PostgreSQL対応)
+        $topics = Topic::where('status', 'active')->get()->filter(function ($topic) {
+            return is_null($topic->link_previews) || 
+                   (is_array($topic->link_previews) && count($topic->link_previews) === 0);
+        });
             
         if ($topics->isEmpty()) {
             $this->info('No topics found that need link preview generation.');
