@@ -408,4 +408,28 @@ class TopicController extends Controller
             'message' => '議題を削除しました'
         ]);
     }
+
+    /**
+     * 既存議題のリンクプレビューを生成
+     */
+    public function generateLinkPreviews(Topic $topic)
+    {
+        try {
+            $linkPreviewService = new LinkPreviewService();
+            $linkPreviews = $linkPreviewService->extractLinksFromContent($topic->content);
+            
+            $topic->update(['link_previews' => $linkPreviews]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'リンクプレビューを生成しました',
+                'link_previews' => $linkPreviews
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'リンクプレビューの生成に失敗しました: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -73,6 +73,9 @@ Route::middleware([
     // コメント評価機能
     Route::post('/comments/{comment}/vote', [TopicController::class, 'vote'])->name('comments.vote');
     
+    // リンクプレビュー生成機能
+    Route::post('/topics/{topic}/generate-previews', [TopicController::class, 'generateLinkPreviews'])->name('topics.generate-previews');
+    
     // 議題の保存・削除機能
     Route::post('/topics/{topic}/save', [TopicController::class, 'saveTopic'])->name('topics.save');
     Route::delete('/topics/{topic}/save', [TopicController::class, 'unsaveTopic'])->name('topics.unsave');
