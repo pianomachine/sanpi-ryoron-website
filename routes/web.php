@@ -227,3 +227,45 @@ Route::get('/admin/seed-status', function () {
         ], 500);
     }
 });
+
+Route::get('/admin/link-preview-status', function () {
+    try {
+        // データベースカラムが存在するか確認
+        $hasColumn = \Schema::hasColumn('topics', 'link_previews');
+        
+        // リンクプレビューがある議題の数を確認
+        $topicsWithPreviews = 0;
+        if ($hasColumn) {
+            $topicsWithPreviews = \App\Models\Topic::whereNotNull('link_previews')
+                ->where('link_previews', '!=', '[]')
+                ->count();
+        }
+        
+        // 最新の議題を1件取得してテスト
+        $latestTopic = \App\Models\Topic::latest()->first();
+        $testPreview = null;
+        
+        if ($latestTopic && $latestTopic->content) {
+            try {
+                $linkPreviewService = new \App\Services\LinkPreviewService();
+                $testPreview = $linkPreviewService->extractLinksFromContent($latestTopic->content);
+            } catch (\Exception $e) {
+                $testPreview = 'Error: ' . $e->getMessage();
+            }
+        }
+        
+        return response()->json([
+            'link_previews_column_exists' => $hasColumn,
+            'topics_with_previews' => $topicsWithPreviews,
+            'latest_topic_id' => $latestTopic ? $latestTopic->id : null,
+            'latest_topic_content' => $latestTopic ? substr($latestTopic->content, 0, 200) : null,
+            'test_preview_result' => $testPreview,
+            'timestamp' => now()->toDateTimeString()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
