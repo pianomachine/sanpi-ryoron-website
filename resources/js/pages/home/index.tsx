@@ -13,11 +13,7 @@ import {
     ArrowUp, 
     ArrowDown, 
     MessageSquare, 
-    Share, 
-    TrendingUp,
-    Clock,
-    Flame,
-    Loader2
+    Share
 } from 'lucide-react';
 
 interface Post {
@@ -99,10 +95,8 @@ export default function RedditHome({
         hasMore, 
         error, 
         refresh,
-        totalCount,
         isItemNew,
-        markItemAsOld,
-        showingSkeleton
+        markItemAsOld
     } = useInfiniteScroll({
         url: '/api/posts',
         initialData: initialPosts,
@@ -312,7 +306,7 @@ export default function RedditHome({
 
                             {/* Posts */}
                             <div className="space-y-3">
-                                {postsWithAds.map((item, index) => {
+                                {postsWithAds.map((item) => {
                                     // Null safety check
                                     if (!item || typeof item !== 'object') {
                                         console.warn('Invalid item in postsWithAds:', item);

@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
-interface InfiniteScrollOptions {
+// Generic type for data items
+type DataItem = Record<string, unknown>;
+
+interface InfiniteScrollOptions<T = DataItem> {
     url: string;
-    initialData?: any[];
-    params?: Record<string, any>;
+    initialData?: T[];
+    params?: Record<string, unknown>;
     threshold?: number;
     enabled?: boolean;
 }
 
-interface InfiniteScrollReturn {
-    data: any[];
+interface InfiniteScrollReturn<T = DataItem> {
+    data: T[];
     loading: boolean;
     hasMore: boolean;
     error: string | null;
@@ -24,14 +27,14 @@ interface InfiniteScrollReturn {
     showingSkeleton: boolean;
 }
 
-export function useInfiniteScroll({
+export function useInfiniteScroll<T = DataItem>({
     url,
     initialData = [],
     params = {},
     threshold = 100, // モバイル向けにしきい値を調整
     enabled = true
-}: InfiniteScrollOptions): InfiniteScrollReturn {
-    const [data, setData] = useState<any[]>(initialData);
+}: InfiniteScrollOptions<T>): InfiniteScrollReturn<T> {
+    const [data, setData] = useState<T[]>(initialData);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -74,7 +77,15 @@ export function useInfiniteScroll({
         setError(null);
 
         try {
-            const response = await axios.get(url, {
+            const response = await axios.get<{
+                data: T[];
+                meta?: {
+                    total: number;
+                };
+                links?: {
+                    next: string | null;
+                };
+            }>(url, {
                 params: {
                     ...params,
                     page: currentPage + 1
@@ -89,13 +100,14 @@ export function useInfiniteScroll({
                 const responseTotalCount = response.data.total_count || 0;
 
                 // nullアイテムをフィルタリング
-                const newData = rawData.filter((item: any) => item !== null && item !== undefined && item.id);
+                const newData = rawData.filter((item: T) => item !== null && item !== undefined && (item as DataItem).id);
 
                 // 新しく追加されるアイテムのIDを記録
                 const newItemIds = new Set<string | number>();
-                newData.forEach((item: any) => {
-                    if (item.id) {
-                        newItemIds.add(item.id);
+                newData.forEach((item: T) => {
+                    const dataItem = item as DataItem;
+                    if (dataItem.id) {
+                        newItemIds.add(dataItem.id as string | number);
                     }
                 });
 
@@ -110,11 +122,11 @@ export function useInfiniteScroll({
                     setShowingSkeleton(false);
                 }, 800);
             }
-        } catch (err: any) {
+        } catch (err) {
             // AbortErrorは無視
-            if (err.name !== 'AbortError') {
+            if (err instanceof Error && err.name !== 'AbortError') {
                 console.error('Failed to load more data:', err);
-                setError(err.response?.data?.error || 'データの読み込みに失敗しました');
+                setError('データの読み込みに失敗しました');
                 setShowingSkeleton(false);
             }
         } finally {
@@ -141,7 +153,15 @@ export function useInfiniteScroll({
         previousDataSizeRef.current = 0;
 
         try {
-            const response = await axios.get(url, {
+            const response = await axios.get<{
+                data: T[];
+                meta?: {
+                    total: number;
+                };
+                links?: {
+                    next: string | null;
+                };
+            }>(url, {
                 params: {
                     ...params,
                     page: 1
@@ -156,7 +176,7 @@ export function useInfiniteScroll({
                 const responseTotalCount = response.data.total_count || 0;
 
                 // nullアイテムをフィルタリング
-                const newData = rawData.filter((item: any) => item !== null && item !== undefined && item.id);
+                const newData = rawData.filter((item: T) => item !== null && item !== undefined && (item as DataItem).id);
 
                 setData(newData);
                 setHasMore(responseHasMore);
@@ -164,11 +184,11 @@ export function useInfiniteScroll({
                 setTotalCount(responseTotalCount);
                 previousDataSizeRef.current = newData.length;
             }
-        } catch (err: any) {
+        } catch (err) {
             // AbortErrorは無視
-            if (err.name !== 'AbortError') {
+            if (err instanceof Error && err.name !== 'AbortError') {
                 console.error('Failed to refresh data:', err);
-                setError(err.response?.data?.error || 'データの読み込みに失敗しました');
+                setError('データの読み込みに失敗しました');
             }
         } finally {
             if (!abortControllerRef.current?.signal.aborted) {

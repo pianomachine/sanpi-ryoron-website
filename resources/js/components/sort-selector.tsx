@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from "framer-motion";
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Flame, Clock, TrendingUp, Star } from 'lucide-react';
@@ -12,13 +12,7 @@ interface SortSelectorProps {
 }
 
 export default function SortSelector({ currentSort, onSortChange }: SortSelectorProps) {
-  const [mounted, setMounted] = useState(false);
   const [localSort, setLocalSort] = useState(currentSort);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
 
   const handleSortChange = (value: string) => {
     setLocalSort(value);

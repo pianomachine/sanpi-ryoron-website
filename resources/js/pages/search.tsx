@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { type User } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -77,7 +77,6 @@ export default function SearchPage({
     const [topicVotes, setTopicVotes] = useState<{[key: number]: 'support' | 'oppose' | null}>({});
     const [votingResults, setVotingResults] = useState<{[key: number]: {support: number, oppose: number} | null}>({});
     const [selectedCategory, setSelectedCategory] = useState<string>('');
-    const [showFilters, setShowFilters] = useState(false);
     const [categoryStats, setCategoryStats] = useState<CategoryStat[]>(category_stats);
 
     const performSearch = async (searchQuery: string, sort: string = 'hot', category: string = '') => {
@@ -108,7 +107,7 @@ export default function SearchPage({
             } else {
                 setError(data.error || '検索中にエラーが発生しました');
             }
-        } catch (err) {
+        } catch {
             setError('検索中にエラーが発生しました');
         } finally {
             setLoading(false);

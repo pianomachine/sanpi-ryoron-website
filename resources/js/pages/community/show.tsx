@@ -21,8 +21,7 @@ import {
     Settings,
     Bell,
     Plus,
-    Star,
-    Loader2
+    Star
 } from 'lucide-react';
 
 interface Post {
@@ -89,7 +88,7 @@ export default function CommunityShow({ community, posts: initialPosts, current_
     // ソートが変更された時にリフレッシュ
     useEffect(() => {
         refresh();
-    }, [current_sort]);
+    }, [current_sort, refresh]);
 
     // アニメーション完了時のハンドラー
     const handleAnimationEnd = (postId: number) => {
