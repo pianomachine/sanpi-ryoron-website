@@ -20,6 +20,24 @@ Route::get('/welcome', function () {
 // メインアプリのルート
 Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/post/{id}', [HomeController::class, 'show'])->name('post.show');
+
+// OG画像生成
+Route::get('/og-image/topic/{id}', function ($id) {
+    $topic = \App\Models\Topic::with(['user', 'community'])->find($id);
+    if (!$topic) {
+        abort(404);
+    }
+    
+    $ogImageService = new \App\Services\OgImageService();
+    $imageUrl = $ogImageService->generateTopicOgImage(
+        $topic->id,
+        $topic->title,
+        $topic->community->name ?? 'Unknown',
+        $topic->user->name ?? 'Anonymous'
+    );
+    
+    return redirect($imageUrl);
+})->name('og-image.topic');
 Route::get('/community/{slug}', [HomeController::class, 'community'])->name('community.show');
 Route::get('/search', function() {
     $query = request('q', '');
@@ -84,6 +102,9 @@ Route::middleware([
     // プロフィール関連API
     Route::get('/profile/topics', [TopicController::class, 'getUserTopics'])->name('profile.topics');
     Route::get('/profile/saved', [TopicController::class, 'getSavedTopics'])->name('profile.saved');
+    
+    // OGP画像生成
+    Route::get('/ogp/topic/{id}.png', [\App\Http\Controllers\OgpController::class, 'topicImage'])->name('ogp.topic');
 
     // リンクプレビューデバッグエンドポイント
     Route::get('/debug/link-previews/{topicId?}', function ($topicId = null) {

@@ -748,8 +748,9 @@ export default function PostShow({ post, comments, community, voting_results, cu
                 <meta property="og:url" content={`${window.location.origin}/post/${post.id}`} />
                 <meta property="og:site_name" content="賛否両論.com" />
                 <meta property="og:locale" content="ja_JP" />
-                {post.image_url && <meta property="og:image" content={post.image_url} />}
-                {!post.image_url && <meta property="og:image" content={`${window.location.origin}/images/default-og-image.png`} />}
+                <meta property="og:image" content={`${window.location.origin}/og-image/topic/${post.id}`} />
+                <meta property="og:image:width" content="1200" />
+                <meta property="og:image:height" content="630" />
                 <meta property="article:author" content={post.author.username} />
                 <meta property="article:published_time" content={post.created_at} />
                 <meta property="article:section" content={post.subreddit} />
@@ -758,8 +759,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content={post.title} />
                 <meta name="twitter:description" content={post.content ? post.content.substring(0, 200) + '...' : 'この議題について議論しませんか？'} />
-                {post.image_url && <meta name="twitter:image" content={post.image_url} />}
-                {!post.image_url && <meta name="twitter:image" content={`${window.location.origin}/images/default-og-image.png`} />}
+                <meta name="twitter:image" content={`${window.location.origin}/og-image/topic/${post.id}`} />
             </Head>
             
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
