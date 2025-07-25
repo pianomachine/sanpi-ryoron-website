@@ -27,24 +27,54 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
     // ヘッダー帯
     imagefilledrectangle($image, 0, 0, $width, 80, $blueColor);
     
-    // テキストを追加（フォントがない場合はビルトインフォントを使用）
-    imagestring($image, 5, 50, 30, '賛否両論.com', $whiteColor);
+    // フォントパスを確認（Laravel Cloudでは日本語フォントが利用可能）
+    $fontPath = public_path('fonts/NotoSansJP-Bold.ttf');
+    $useFont = file_exists($fontPath);
     
-    // タイトルを適切な長さに制限
-    $displayTitle = mb_strlen($title) > 60 ? mb_substr($title, 0, 57) . '...' : $title;
-    
-    // タイトル（中央）
-    $titleX = ($width - strlen($displayTitle) * 10) / 2;
-    imagestring($image, 5, max(50, $titleX), 200, $displayTitle, $whiteColor);
-    
-    // コミュニティ名
-    imagestring($image, 3, 100, 480, $communityName, $grayColor);
-    
-    // 投稿者
-    imagestring($image, 3, 100, 520, "by {$authorName}", $grayColor);
-    
-    // サイトURL
-    imagestring($image, 3, 800, 520, 'sanpi-ryoron.com', $grayColor);
+    if ($useFont) {
+        // TTFフォントを使用した日本語対応テキスト描画
+        
+        // サイト名
+        imagettftext($image, 24, 0, 50, 50, $whiteColor, $fontPath, '賛否両論.com');
+        
+        // タイトルを適切な長さに制限し、改行処理
+        $displayTitle = mb_strlen($title) > 40 ? mb_substr($title, 0, 37) . '...' : $title;
+        
+        // タイトル（中央配置）
+        $titleBbox = imagettfbbox(32, 0, $fontPath, $displayTitle);
+        $titleWidth = $titleBbox[4] - $titleBbox[0];
+        $titleX = ($width - $titleWidth) / 2;
+        imagettftext($image, 32, 0, $titleX, 250, $whiteColor, $fontPath, $displayTitle);
+        
+        // コミュニティ名
+        imagettftext($image, 18, 0, 100, 500, $grayColor, $fontPath, $communityName);
+        
+        // 投稿者
+        imagettftext($image, 18, 0, 100, 540, $grayColor, $fontPath, "by {$authorName}");
+        
+        // サイトURL
+        imagettftext($image, 16, 0, 800, 580, $grayColor, $fontPath, 'sanpi-ryoron.com');
+        
+    } else {
+        // フォールバック：シンプルなレイアウト（フォントなし）
+        
+        // サイト名（大きく表示）
+        imagestring($image, 5, 50, 25, 'SANPI-RYORON.COM', $whiteColor);
+        
+        // 「議題」ラベル
+        imagestring($image, 4, 100, 150, 'TOPIC:', $whiteColor);
+        
+        // タイトルプレースホルダー（日本語は表示不可）
+        imagestring($image, 3, 100, 200, 'Japanese Topic Title', $whiteColor);
+        imagestring($image, 2, 100, 230, '(Japanese characters cannot be displayed)', $grayColor);
+        
+        // コミュニティとユーザー情報
+        imagestring($image, 3, 100, 480, 'Community: ' . (mb_check_encoding($communityName, 'ASCII') ? $communityName : 'Japanese Community'), $grayColor);
+        imagestring($image, 3, 100, 520, 'Author: ' . (mb_check_encoding($authorName, 'ASCII') ? $authorName : 'Japanese Author'), $grayColor);
+        
+        // サイトURL
+        imagestring($image, 3, 800, 580, 'sanpi-ryoron.com', $grayColor);
+    }
     
     // 画像データを取得
     ob_start();
