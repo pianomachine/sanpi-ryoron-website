@@ -7,6 +7,55 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\WorkOS\Http\Middleware\ValidateSessionWithWorkOS;
 
+// OG画像生成ヘルパー関数
+function generateOgImageInMemory($title, $communityName, $authorName) {
+    $width = 1200;
+    $height = 630;
+    
+    // キャンバス作成
+    $image = imagecreatetruecolor($width, $height);
+    
+    // 色を定義
+    $bgColor = imagecolorallocate($image, 30, 41, 59); // #1e293b
+    $blueColor = imagecolorallocate($image, 59, 130, 246); // #3b82f6
+    $whiteColor = imagecolorallocate($image, 255, 255, 255);
+    $grayColor = imagecolorallocate($image, 148, 163, 184); // #94a3b8
+    
+    // 背景を塗りつぶし
+    imagefill($image, 0, 0, $bgColor);
+    
+    // ヘッダー帯
+    imagefilledrectangle($image, 0, 0, $width, 80, $blueColor);
+    
+    // テキストを追加（フォントがない場合はビルトインフォントを使用）
+    imagestring($image, 5, 50, 30, '賛否両論.com', $whiteColor);
+    
+    // タイトルを適切な長さに制限
+    $displayTitle = mb_strlen($title) > 60 ? mb_substr($title, 0, 57) . '...' : $title;
+    
+    // タイトル（中央）
+    $titleX = ($width - strlen($displayTitle) * 10) / 2;
+    imagestring($image, 5, max(50, $titleX), 200, $displayTitle, $whiteColor);
+    
+    // コミュニティ名
+    imagestring($image, 3, 100, 480, $communityName, $grayColor);
+    
+    // 投稿者
+    imagestring($image, 3, 100, 520, "by {$authorName}", $grayColor);
+    
+    // サイトURL
+    imagestring($image, 3, 800, 520, 'sanpi-ryoron.com', $grayColor);
+    
+    // 画像データを取得
+    ob_start();
+    imagepng($image);
+    $imageData = ob_get_contents();
+    ob_end_clean();
+    imagedestroy($image);
+    
+    return $imageData;
+}
+
 // メインアプリ - トップページを/homeにリダイレクト
 Route::get('/', function () {
     return redirect('/welcome');
@@ -30,55 +79,17 @@ Route::get('/og-image/topic/{id}', function ($id) {
             abort(404);
         }
         
-        $ogImageService = new \App\Services\SimpleOgImageService();
-        $filename = $ogImageService->generateTopicOgImage(
-            $topic->id,
+        // メモリ上で直接OG画像を生成
+        $imageData = generateOgImageInMemory(
             $topic->title,
             $topic->community->name ?? 'Unknown',
             $topic->user->name ?? 'Anonymous'
         );
         
-        // 使用するディスクを決定
-        $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
-        
-        \Log::info('OG Image generation started', [
-            'topic_id' => $id,
-            'topic_title' => $topic->title,
-            'disk' => $disk,
-            'filesystem_default' => config('filesystems.default')
-        ]);
-        
-        if ($disk === 's3') {
-            // S3から画像データを取得して直接レスポンス
-            if (!\Illuminate\Support\Facades\Storage::disk('s3')->exists($filename)) {
-                abort(404);
-            }
-            
-            $imageData = \Illuminate\Support\Facades\Storage::disk('s3')->get($filename);
-            return response($imageData)
-                ->header('Content-Type', 'image/png')
-                ->header('Cache-Control', 'public, max-age=31536000')
-                ->header('Expires', gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000));
-        } else {
-            // ローカルファイルシステムから画像データを直接レスポンス
-            $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($filename);
-            
-            if (!file_exists($fullPath)) {
-                \Log::error('OG Image: File not found', [
-                    'topic_id' => $id,
-                    'filename' => $filename,
-                    'fullPath' => $fullPath,
-                    'disk' => $disk
-                ]);
-                abort(404);
-            }
-            
-            return response()->file($fullPath, [
-                'Content-Type' => 'image/png',
-                'Cache-Control' => 'public, max-age=31536000',
-                'Expires' => gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000)
-            ]);
-        }
+        return response($imageData)
+            ->header('Content-Type', 'image/png')
+            ->header('Cache-Control', 'public, max-age=31536000')
+            ->header('Expires', gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000));
         
     } catch (\Exception $e) {
         \Log::error('OG Image generation failed: ' . $e->getMessage(), [
