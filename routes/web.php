@@ -26,6 +26,65 @@ function removeEmojis($text) {
     return $cleaned;
 }
 
+// テキストを複数行に分割するヘルパー関数（日本語対応）
+function wrapText($text, $fontPath, $fontSize, $maxWidth) {
+    $lines = [];
+    $currentLine = '';
+    
+    // 日本語テキストは文字単位で処理
+    $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
+    
+    foreach ($chars as $char) {
+        $testLine = $currentLine . $char;
+        $bbox = imagettfbbox($fontSize, 0, $fontPath, $testLine);
+        $textWidth = $bbox[4] - $bbox[0];
+        
+        if ($textWidth <= $maxWidth || $currentLine === '') {
+            $currentLine = $testLine;
+        } else {
+            if ($currentLine !== '') {
+                $lines[] = $currentLine;
+            }
+            $currentLine = $char;
+        }
+    }
+    
+    if ($currentLine !== '') {
+        $lines[] = $currentLine;
+    }
+    
+    return $lines;
+}
+
+// 最適なフォントサイズを計算するヘルパー関数
+function calculateOptimalFontSize($text, $fontPath, $maxWidth, $maxHeight, $maxLines = 3) {
+    $minSize = 20;
+    $maxSize = 32;
+    
+    for ($size = $maxSize; $size >= $minSize; $size -= 2) {
+        $lines = wrapText($text, $fontPath, $size, $maxWidth);
+        
+        if (count($lines) <= $maxLines) {
+            // 高さもチェック
+            $lineHeight = $size * 1.2;
+            $totalHeight = count($lines) * $lineHeight;
+            
+            if ($totalHeight <= $maxHeight) {
+                return [$size, $lines];
+            }
+        }
+    }
+    
+    // 最小サイズでも収まらない場合は切り詰める
+    $lines = wrapText($text, $fontPath, $minSize, $maxWidth);
+    if (count($lines) > $maxLines) {
+        $lines = array_slice($lines, 0, $maxLines);
+        $lines[$maxLines - 1] = mb_substr($lines[$maxLines - 1], 0, -3) . '...';
+    }
+    
+    return [$minSize, $lines];
+}
+
 // OG画像生成ヘルパー関数
 function generateOgImageInMemory($title, $communityName, $authorName) {
     $width = 1200;
@@ -61,20 +120,30 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
         // サイト名
         imagettftext($image, 24, 0, 50, 50, $whiteColor, $fontPath, '賛否両論.com');
         
-        // タイトルを適切な長さに制限し、改行処理
-        $displayTitle = mb_strlen($cleanTitle) > 40 ? mb_substr($cleanTitle, 0, 37) . '...' : $cleanTitle;
+        // タイトルの最適なサイズと行分割を計算
+        $titleMaxWidth = $width - 100; // 左右50pxずつマージン
+        $titleMaxHeight = 200; // タイトル用の最大高さ
+        list($fontSize, $titleLines) = calculateOptimalFontSize($cleanTitle, $fontPath, $titleMaxWidth, $titleMaxHeight, 3);
         
-        // タイトル（中央配置）
-        $titleBbox = imagettfbbox(32, 0, $fontPath, $displayTitle);
-        $titleWidth = $titleBbox[4] - $titleBbox[0];
-        $titleX = ($width - $titleWidth) / 2;
-        imagettftext($image, 32, 0, $titleX, 250, $whiteColor, $fontPath, $displayTitle);
+        // タイトルを複数行で描画
+        $lineHeight = $fontSize * 1.2;
+        $totalTitleHeight = count($titleLines) * $lineHeight;
+        $startY = 180 + (($titleMaxHeight - $totalTitleHeight) / 2); // 中央寄せ
         
-        // コミュニティ名
-        imagettftext($image, 18, 0, 100, 500, $grayColor, $fontPath, $cleanCommunityName);
+        foreach ($titleLines as $i => $line) {
+            $lineBbox = imagettfbbox($fontSize, 0, $fontPath, $line);
+            $lineWidth = $lineBbox[4] - $lineBbox[0];
+            $lineX = ($width - $lineWidth) / 2; // 各行を中央揃え
+            $lineY = $startY + ($i * $lineHeight);
+            imagettftext($image, $fontSize, 0, $lineX, $lineY, $whiteColor, $fontPath, $line);
+        }
+        
+        // コミュニティ名（タイトルの下に配置）
+        $communityY = max(450, $startY + $totalTitleHeight + 50);
+        imagettftext($image, 18, 0, 100, $communityY, $grayColor, $fontPath, $cleanCommunityName);
         
         // 投稿者
-        imagettftext($image, 18, 0, 100, 540, $grayColor, $fontPath, "by {$cleanAuthorName}");
+        imagettftext($image, 18, 0, 100, $communityY + 40, $grayColor, $fontPath, "by {$cleanAuthorName}");
         
         // サイトURL
         imagettftext($image, 16, 0, 800, 580, $grayColor, $fontPath, 'sanpi-ryoron.com');
