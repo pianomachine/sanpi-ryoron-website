@@ -315,7 +315,7 @@ Route::post('/topics/{topic}/vote', [TopicController::class, 'voteTopic'])->name
 
 Route::middleware([
     'auth',
-    ValidateSessionWithWorkOS::class,
+    \App\Http\Middleware\ValidateSessionWithWorkOSJson::class,
 ])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
