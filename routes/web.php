@@ -76,6 +76,11 @@ Route::get('/og-image/topic/{id}', function ($id) {
     }
 })->name('og-image.topic');
 
+// Storage OG画像のフォールバック（Laravel Cloudのシンボリックリンク問題の回避）
+Route::get('/storage/og-images/topic-{id}.png', function ($id) {
+    return redirect()->route('og-image.topic', ['id' => $id]);
+})->where('id', '[0-9]+');
+
 // OG画像生成デバッグエンドポイント
 Route::get('/debug/og-image/topic/{id}', function ($id) {
     try {
