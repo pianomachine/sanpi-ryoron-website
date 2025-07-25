@@ -72,16 +72,30 @@ Route::get('/debug/og-image/topic/{id}', function ($id) {
         ];
         
         // 実際に画像生成を試行
-        $ogImageService = new \App\Services\SimpleOgImageService();
-        $imageUrl = $ogImageService->generateTopicOgImage(
-            $topic->id,
-            $topic->title,
-            $topic->community->name ?? 'Unknown',
-            $topic->user->name ?? 'Anonymous'
-        );
-        
-        $checks['generation_success'] = true;
-        $checks['image_url'] = $imageUrl;
+        try {
+            $ogImageService = new \App\Services\SimpleOgImageService();
+            $imageUrl = $ogImageService->generateTopicOgImage(
+                $topic->id,
+                $topic->title,
+                $topic->community->name ?? 'Unknown',
+                $topic->user->name ?? 'Anonymous'
+            );
+            
+            $checks['generation_success'] = true;
+            $checks['image_url'] = $imageUrl;
+            
+            // ファイルの実際の存在確認
+            $filename = "og-images/topic-{$topic->id}.png";
+            $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($filename);
+            $checks['file_exists'] = file_exists($fullPath);
+            $checks['file_path'] = $fullPath;
+            $checks['file_size'] = file_exists($fullPath) ? filesize($fullPath) : 0;
+            
+        } catch (\Exception $e) {
+            $checks['generation_success'] = false;
+            $checks['error'] = $e->getMessage();
+            $checks['image_url'] = null;
+        }
         
         return response()->json($checks);
         

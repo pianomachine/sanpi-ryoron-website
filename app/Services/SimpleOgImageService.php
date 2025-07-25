@@ -78,8 +78,20 @@ class SimpleOgImageService
         // ファイルに保存
         $filename = "og-images/topic-{$topicId}.png";
         $fullPath = Storage::disk('public')->path($filename);
+        
+        // ディレクトリが存在することを確認
+        $directory = dirname($fullPath);
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
+        }
+        
         imagepng($image, $fullPath);
         imagedestroy($image);
+        
+        // ファイルが実際に作成されたかチェック
+        if (!file_exists($fullPath)) {
+            throw new \Exception("Failed to create OG image file: {$fullPath}");
+        }
         
         return $filename;
     }
