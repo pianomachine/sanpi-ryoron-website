@@ -23,21 +23,80 @@ Route::get('/post/{id}', [HomeController::class, 'show'])->name('post.show');
 
 // OG画像生成
 Route::get('/og-image/topic/{id}', function ($id) {
-    $topic = \App\Models\Topic::with(['user', 'community'])->find($id);
-    if (!$topic) {
-        abort(404);
+    try {
+        $topic = \App\Models\Topic::with(['user', 'community'])->find($id);
+        if (!$topic) {
+            abort(404);
+        }
+        
+        $ogImageService = new \App\Services\SimpleOgImageService();
+        $imageUrl = $ogImageService->generateTopicOgImage(
+            $topic->id,
+            $topic->title,
+            $topic->community->name ?? 'Unknown',
+            $topic->user->name ?? 'Anonymous'
+        );
+        
+        return redirect($imageUrl);
+    } catch (\Exception $e) {
+        \Log::error('OG Image generation failed: ' . $e->getMessage(), [
+            'topic_id' => $id,
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        // フォールバック：デフォルト画像にリダイレクト
+        return redirect('/images/default-og-image.png');
     }
-    
-    $ogImageService = new \App\Services\OgImageService();
-    $imageUrl = $ogImageService->generateTopicOgImage(
-        $topic->id,
-        $topic->title,
-        $topic->community->name ?? 'Unknown',
-        $topic->user->name ?? 'Anonymous'
-    );
-    
-    return redirect($imageUrl);
 })->name('og-image.topic');
+
+// OG画像生成デバッグエンドポイント
+Route::get('/debug/og-image/topic/{id}', function ($id) {
+    try {
+        $topic = \App\Models\Topic::with(['user', 'community'])->find($id);
+        if (!$topic) {
+            return response()->json(['error' => 'Topic not found'], 404);
+        }
+        
+        // 拡張チェック
+        $checks = [
+            'gd_available' => extension_loaded('gd'),
+            'imagick_available' => extension_loaded('imagick'),
+            'storage_writable' => is_writable(storage_path('app/public')),
+            'font_exists' => file_exists(public_path('fonts/NotoSansJP-Bold.ttf')),
+            'topic_data' => [
+                'id' => $topic->id,
+                'title' => $topic->title,
+                'community' => $topic->community->name ?? 'Unknown',
+                'author' => $topic->user->name ?? 'Anonymous'
+            ]
+        ];
+        
+        // 実際に画像生成を試行
+        $ogImageService = new \App\Services\SimpleOgImageService();
+        $imageUrl = $ogImageService->generateTopicOgImage(
+            $topic->id,
+            $topic->title,
+            $topic->community->name ?? 'Unknown',
+            $topic->user->name ?? 'Anonymous'
+        );
+        
+        $checks['generation_success'] = true;
+        $checks['image_url'] = $imageUrl;
+        
+        return response()->json($checks);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'gd_available' => extension_loaded('gd'),
+            'imagick_available' => extension_loaded('imagick'),
+            'storage_writable' => is_writable(storage_path('app/public')),
+            'font_exists' => file_exists(public_path('fonts/NotoSansJP-Bold.ttf'))
+        ], 500);
+    }
+});
 Route::get('/community/{slug}', [HomeController::class, 'community'])->name('community.show');
 Route::get('/search', function() {
     $query = request('q', '');

@@ -9,11 +9,16 @@ use Illuminate\Support\Str;
 
 class OgImageService
 {
-    private ImageManager $manager;
+    private ?ImageManager $manager = null;
     
     public function __construct()
     {
-        $this->manager = new ImageManager(new Driver());
+        try {
+            $this->manager = new ImageManager(new Driver());
+        } catch (\Exception $e) {
+            \Log::error('Failed to initialize ImageManager: ' . $e->getMessage());
+            throw $e;
+        }
     }
     
     /**
@@ -25,6 +30,12 @@ class OgImageService
         $filename = "og-images/topic-{$topicId}.png";
         if (Storage::disk('public')->exists($filename)) {
             return Storage::url($filename);
+        }
+        
+        // ディレクトリを作成
+        $directory = Storage::disk('public')->path('og-images');
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
         }
         
         // 画像サイズ (OGP推奨: 1200x630)
