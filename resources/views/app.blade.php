@@ -33,6 +33,21 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
+        {{-- Meta tags for social media sharing --}}
+        @if(isset($meta))
+            <meta property="og:title" content="{{ $meta['title'] ?? config('app.name') }}">
+            <meta property="og:description" content="{{ $meta['description'] ?? '' }}">
+            <meta property="og:image" content="{{ $meta['image'] ?? '' }}">
+            <meta property="og:url" content="{{ $meta['url'] ?? url()->current() }}">
+            <meta property="og:type" content="article">
+            <meta property="og:site_name" content="賛否両論.com">
+            
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="{{ $meta['title'] ?? config('app.name') }}">
+            <meta name="twitter:description" content="{{ $meta['description'] ?? '' }}">
+            <meta name="twitter:image" content="{{ $meta['image'] ?? '' }}">
+        @endif
+
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">

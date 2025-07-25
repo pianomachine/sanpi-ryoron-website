@@ -269,6 +269,15 @@ class HomeController extends Controller
         if (!$topic) {
             abort(404);
         }
+        
+        // OG画像URLを生成
+        $ogImageService = new \App\Services\SimpleOgImageService();
+        $ogImageUrl = url($ogImageService->generateTopicOgImage(
+            $topic->id,
+            $topic->title,
+            $topic->community->name ?? 'Unknown',
+            $topic->user->name ?? 'Anonymous'
+        ));
 
         // 投票割合を計算（認証済み + 匿名投票の合計）
         $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
@@ -353,6 +362,18 @@ class HomeController extends Controller
                     'score' => $relatedTopic->score
                 ];
             });
+
+        // メタタグ用データを設定
+        $description = mb_strlen($topic->content) > 150 
+            ? mb_substr(strip_tags($topic->content), 0, 147) . '...' 
+            : strip_tags($topic->content);
+        
+        view()->share('meta', [
+            'title' => $topic->title . ' - 賛否両論.com',
+            'description' => $description,
+            'image' => $ogImageUrl,
+            'url' => url()->current()
+        ]);
 
         return Inertia::render('post/show', [
             'post' => [
