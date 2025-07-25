@@ -13,14 +13,10 @@ class SimpleOgImageService
     {
         // キャッシュチェック
         $filename = "og-images/topic-{$topicId}.png";
-        if (Storage::disk('public')->exists($filename)) {
-            return Storage::url($filename);
-        }
+        $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
         
-        // ディレクトリを作成
-        $directory = Storage::disk('public')->path('og-images');
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
+        if (Storage::disk($disk)->exists($filename)) {
+            return Storage::disk($disk)->url($filename);
         }
         
         // タイトルを適切な長さに制限
@@ -28,18 +24,18 @@ class SimpleOgImageService
         
         // GDが利用可能な場合はGDで生成、そうでなければSVG
         if (extension_loaded('gd')) {
-            $imagePath = $this->generateWithGd($displayTitle, $communityName, $authorName, $topicId);
+            $imagePath = $this->generateWithGd($displayTitle, $communityName, $authorName, $topicId, $disk);
         } else {
             // フォールバック：SVGを生成
             $svg = $this->generateSvg($displayTitle, $communityName, $authorName);
-            Storage::disk('public')->put("og-images/topic-{$topicId}.svg", $svg);
-            return Storage::url("og-images/topic-{$topicId}.svg");
+            Storage::disk($disk)->put($filename, $svg);
+            return Storage::disk($disk)->url($filename);
         }
         
-        return Storage::url($filename);
+        return Storage::disk($disk)->url($filename);
     }
     
-    private function generateWithGd(string $title, string $communityName, string $authorName, int $topicId): string
+    private function generateWithGd(string $title, string $communityName, string $authorName, int $topicId, string $disk = 'public'): string
     {
         $width = 1200;
         $height = 630;
@@ -77,20 +73,36 @@ class SimpleOgImageService
         
         // ファイルに保存
         $filename = "og-images/topic-{$topicId}.png";
-        $fullPath = Storage::disk('public')->path($filename);
         
-        // ディレクトリが存在することを確認
-        $directory = dirname($fullPath);
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-        
-        imagepng($image, $fullPath);
-        imagedestroy($image);
-        
-        // ファイルが実際に作成されたかチェック
-        if (!file_exists($fullPath)) {
-            throw new \Exception("Failed to create OG image file: {$fullPath}");
+        if ($disk === 's3') {
+            // S3に直接保存
+            ob_start();
+            imagepng($image);
+            $imageData = ob_get_contents();
+            ob_end_clean();
+            imagedestroy($image);
+            
+            Storage::disk('s3')->put($filename, $imageData, [
+                'ContentType' => 'image/png',
+                'CacheControl' => 'max-age=31536000'
+            ]);
+        } else {
+            // ローカルファイルシステムに保存
+            $fullPath = Storage::disk('public')->path($filename);
+            
+            // ディレクトリが存在することを確認
+            $directory = dirname($fullPath);
+            if (!file_exists($directory)) {
+                mkdir($directory, 0755, true);
+            }
+            
+            imagepng($image, $fullPath);
+            imagedestroy($image);
+            
+            // ファイルが実際に作成されたかチェック
+            if (!file_exists($fullPath)) {
+                throw new \Exception("Failed to create OG image file: {$fullPath}");
+            }
         }
         
         return $filename;
