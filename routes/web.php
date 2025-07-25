@@ -26,6 +26,7 @@ Route::get('/og-image/topic/{id}', function ($id) {
     try {
         $topic = \App\Models\Topic::with(['user', 'community'])->find($id);
         if (!$topic) {
+            \Log::error('OG Image: Topic not found', ['topic_id' => $id]);
             abort(404);
         }
         
@@ -39,6 +40,13 @@ Route::get('/og-image/topic/{id}', function ($id) {
         
         // 使用するディスクを決定
         $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
+        
+        \Log::info('OG Image generation started', [
+            'topic_id' => $id,
+            'topic_title' => $topic->title,
+            'disk' => $disk,
+            'filesystem_default' => config('filesystems.default')
+        ]);
         
         if ($disk === 's3') {
             // S3から画像データを取得して直接レスポンス
@@ -56,6 +64,12 @@ Route::get('/og-image/topic/{id}', function ($id) {
             $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($filename);
             
             if (!file_exists($fullPath)) {
+                \Log::error('OG Image: File not found', [
+                    'topic_id' => $id,
+                    'filename' => $filename,
+                    'fullPath' => $fullPath,
+                    'disk' => $disk
+                ]);
                 abort(404);
             }
             
