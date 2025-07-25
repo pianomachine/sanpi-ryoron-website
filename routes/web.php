@@ -66,7 +66,7 @@ function calculateOptimalFontSize($text, $fontPath, $maxWidth, $maxHeight, $maxL
         
         if (count($lines) <= $maxLines) {
             // 高さもチェック
-            $lineHeight = $size * 1.2;
+            $lineHeight = $size * 1.5; // 実際の描画と同じ行間隔を使用
             $totalHeight = count($lines) * $lineHeight;
             
             if ($totalHeight <= $maxHeight) {
@@ -125,8 +125,8 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
         $titleMaxHeight = 200; // タイトル用の最大高さ
         list($fontSize, $titleLines) = calculateOptimalFontSize($cleanTitle, $fontPath, $titleMaxWidth, $titleMaxHeight, 3);
         
-        // タイトルを複数行で描画
-        $lineHeight = $fontSize * 1.2;
+        // タイトルを複数行で描画（行間隔を広げる）
+        $lineHeight = $fontSize * 1.5; // 1.2から1.5に変更してゆとりを持たせる
         $totalTitleHeight = count($titleLines) * $lineHeight;
         $startY = 180 + (($titleMaxHeight - $totalTitleHeight) / 2); // 中央寄せ
         
@@ -138,12 +138,11 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
             imagettftext($image, $fontSize, 0, $lineX, $lineY, $whiteColor, $fontPath, $line);
         }
         
-        // コミュニティ名（タイトルの下に配置）
-        $communityY = max(450, $startY + $totalTitleHeight + 50);
-        imagettftext($image, 18, 0, 100, $communityY, $grayColor, $fontPath, $cleanCommunityName);
+        // コミュニティ名（元の固定位置に戻す）
+        imagettftext($image, 18, 0, 100, 500, $grayColor, $fontPath, $cleanCommunityName);
         
-        // 投稿者
-        imagettftext($image, 18, 0, 100, $communityY + 40, $grayColor, $fontPath, "by {$cleanAuthorName}");
+        // 投稿者（元の固定位置に戻す）
+        imagettftext($image, 18, 0, 100, 540, $grayColor, $fontPath, "by {$cleanAuthorName}");
         
         // サイトURL
         imagettftext($image, 16, 0, 800, 580, $grayColor, $fontPath, 'sanpi-ryoron.com');
