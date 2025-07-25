@@ -902,6 +902,7 @@ export default function PostShow({ post, comments, community, voting_results, cu
                                         )}
 
                                         {/* Link Previews */}
+                                        {console.log('Post link_previews:', post.link_previews)}
                                         {post.link_previews && post.link_previews.length > 0 && (
                                             <div className="mb-4">
                                                 <LinkPreviews previews={post.link_previews} />

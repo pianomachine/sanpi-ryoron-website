@@ -85,6 +85,77 @@ Route::middleware([
     Route::get('/profile/topics', [TopicController::class, 'getUserTopics'])->name('profile.topics');
     Route::get('/profile/saved', [TopicController::class, 'getSavedTopics'])->name('profile.saved');
 
+    // リンクプレビューデバッグエンドポイント
+    Route::get('/debug/link-previews/{topicId?}', function ($topicId = null) {
+        if ($topicId) {
+            $topic = \App\Models\Topic::find($topicId);
+            if (!$topic) {
+                return response()->json(['error' => 'Topic not found'], 404);
+            }
+            
+            return response()->json([
+                'topic_id' => $topic->id,
+                'title' => $topic->title,
+                'content' => $topic->content,
+                'link_previews' => $topic->link_previews,
+                'link_previews_count' => is_array($topic->link_previews) ? count($topic->link_previews) : 0,
+                'has_urls' => str_contains($topic->content, 'http'),
+                'database_column_type' => \DB::select("SELECT data_type FROM information_schema.columns WHERE table_name = 'topics' AND column_name = 'link_previews'")[0]->data_type ?? 'unknown'
+            ]);
+        }
+        
+        // 全体の統計情報
+        $totalTopics = \App\Models\Topic::count();
+        $topicsWithLinkPreviews = \App\Models\Topic::whereNotNull('link_previews')
+            ->whereRaw("link_previews::text != '[]'")
+            ->count();
+        $topicsWithUrls = \App\Models\Topic::where('content', 'LIKE', '%http%')->count();
+        $sampleTopicsWithUrls = \App\Models\Topic::where('content', 'LIKE', '%http%')
+            ->limit(5)
+            ->get(['id', 'title', 'link_previews']);
+            
+        return response()->json([
+            'total_topics' => $totalTopics,
+            'topics_with_link_previews' => $topicsWithLinkPreviews,
+            'topics_with_urls_in_content' => $topicsWithUrls,
+            'sample_topics_with_urls' => $sampleTopicsWithUrls->map(function ($topic) {
+                return [
+                    'id' => $topic->id,
+                    'title' => $topic->title,
+                    'link_previews' => $topic->link_previews,
+                    'preview_count' => is_array($topic->link_previews) ? count($topic->link_previews) : 0
+                ];
+            }),
+            'database_info' => [
+                'link_previews_column_exists' => \Schema::hasColumn('topics', 'link_previews'),
+                'column_type' => \DB::select("SELECT data_type FROM information_schema.columns WHERE table_name = 'topics' AND column_name = 'link_previews'")[0]->data_type ?? 'unknown'
+            ]
+        ]);
+    });
+    
+    // リンクプレビューテスト生成エンドポイント
+    Route::get('/debug/test-link-preview-generation/{topicId}', function ($topicId) {
+        $topic = \App\Models\Topic::find($topicId);
+        if (!$topic) {
+            return response()->json(['error' => 'Topic not found'], 404);
+        }
+        
+        $linkPreviewService = new \App\Services\LinkPreviewService();
+        $generatedPreviews = $linkPreviewService->extractLinksFromContent($topic->content);
+        
+        // 実際に更新
+        $topic->update(['link_previews' => $generatedPreviews]);
+        
+        return response()->json([
+            'topic_id' => $topic->id,
+            'title' => $topic->title,
+            'content' => $topic->content,
+            'generated_previews' => $generatedPreviews,
+            'saved_to_database' => true,
+            'preview_count' => count($generatedPreviews)
+        ]);
+    });
+
     Route::get('/debug/popular-posts-calculation', function () {
         $todayStart = now()->startOfDay();
         $todayTopics = \App\Models\Topic::where('created_at', '>=', $todayStart)
