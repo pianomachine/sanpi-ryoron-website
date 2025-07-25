@@ -70,8 +70,12 @@ class TopicController extends Controller
                 ->exists();
         }
 
+        // topicデータに明示的にlink_previewsを含める
+        $topicData = $topic->toArray();
+        $topicData['link_previews'] = $topic->link_previews;
+        
         return Inertia::render('topics/show', [
-            'topic' => $topic,
+            'topic' => $topicData,
             'supportComments' => $supportComments->values(),
             'opposeComments' => $opposeComments->values(),
             'neutralComments' => $neutralComments->values(),

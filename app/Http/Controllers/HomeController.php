@@ -377,6 +377,7 @@ class HomeController extends Controller
                 'created_at' => $topic->created_at->toISOString(),
                 'url' => $topic->url,
                 'image_url' => $topic->image_url,
+                'link_previews' => $topic->link_previews ?? [],
                 'is_nsfw' => $topic->is_nsfw ?? false,
                 'is_spoiler' => $topic->is_spoiler ?? false,
                 'flair' => $topic->flair,
