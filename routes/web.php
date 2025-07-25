@@ -7,6 +7,25 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\WorkOS\Http\Middleware\ValidateSessionWithWorkOS;
 
+// 絵文字除去ヘルパー関数
+function removeEmojis($text) {
+    // 絵文字と記号を除去する正規表現
+    $cleaned = preg_replace('/[\x{1F600}-\x{1F64F}]/u', '', $text); // emoticons
+    $cleaned = preg_replace('/[\x{1F300}-\x{1F5FF}]/u', '', $cleaned); // misc symbols
+    $cleaned = preg_replace('/[\x{1F680}-\x{1F6FF}]/u', '', $cleaned); // transport
+    $cleaned = preg_replace('/[\x{1F1E0}-\x{1F1FF}]/u', '', $cleaned); // flags
+    $cleaned = preg_replace('/[\x{2600}-\x{26FF}]/u', '', $cleaned); // misc symbols
+    $cleaned = preg_replace('/[\x{2700}-\x{27BF}]/u', '', $cleaned); // dingbats
+    $cleaned = preg_replace('/[\x{1F900}-\x{1F9FF}]/u', '', $cleaned); // supplemental symbols
+    $cleaned = preg_replace('/[\x{1FA70}-\x{1FAFF}]/u', '', $cleaned); // symbols and pictographs extended-a
+    
+    // 余分な空白を削除
+    $cleaned = preg_replace('/\s+/', ' ', $cleaned);
+    $cleaned = trim($cleaned);
+    
+    return $cleaned;
+}
+
 // OG画像生成ヘルパー関数
 function generateOgImageInMemory($title, $communityName, $authorName) {
     $width = 1200;
@@ -27,6 +46,11 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
     // ヘッダー帯
     imagefilledrectangle($image, 0, 0, $width, 80, $blueColor);
     
+    // テキストから絵文字を除去
+    $cleanTitle = removeEmojis($title);
+    $cleanCommunityName = removeEmojis($communityName);
+    $cleanAuthorName = removeEmojis($authorName);
+    
     // フォントパスを確認（Laravel Cloudでは日本語フォントが利用可能）
     $fontPath = public_path('fonts/NotoSansJP-Bold.ttf');
     $useFont = file_exists($fontPath);
@@ -38,7 +62,7 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
         imagettftext($image, 24, 0, 50, 50, $whiteColor, $fontPath, '賛否両論.com');
         
         // タイトルを適切な長さに制限し、改行処理
-        $displayTitle = mb_strlen($title) > 40 ? mb_substr($title, 0, 37) . '...' : $title;
+        $displayTitle = mb_strlen($cleanTitle) > 40 ? mb_substr($cleanTitle, 0, 37) . '...' : $cleanTitle;
         
         // タイトル（中央配置）
         $titleBbox = imagettfbbox(32, 0, $fontPath, $displayTitle);
@@ -47,10 +71,10 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
         imagettftext($image, 32, 0, $titleX, 250, $whiteColor, $fontPath, $displayTitle);
         
         // コミュニティ名
-        imagettftext($image, 18, 0, 100, 500, $grayColor, $fontPath, $communityName);
+        imagettftext($image, 18, 0, 100, 500, $grayColor, $fontPath, $cleanCommunityName);
         
         // 投稿者
-        imagettftext($image, 18, 0, 100, 540, $grayColor, $fontPath, "by {$authorName}");
+        imagettftext($image, 18, 0, 100, 540, $grayColor, $fontPath, "by {$cleanAuthorName}");
         
         // サイトURL
         imagettftext($image, 16, 0, 800, 580, $grayColor, $fontPath, 'sanpi-ryoron.com');
@@ -69,8 +93,8 @@ function generateOgImageInMemory($title, $communityName, $authorName) {
         imagestring($image, 2, 100, 230, '(Japanese characters cannot be displayed)', $grayColor);
         
         // コミュニティとユーザー情報
-        imagestring($image, 3, 100, 480, 'Community: ' . (mb_check_encoding($communityName, 'ASCII') ? $communityName : 'Japanese Community'), $grayColor);
-        imagestring($image, 3, 100, 520, 'Author: ' . (mb_check_encoding($authorName, 'ASCII') ? $authorName : 'Japanese Author'), $grayColor);
+        imagestring($image, 3, 100, 480, 'Community: ' . (mb_check_encoding($cleanCommunityName, 'ASCII') ? $cleanCommunityName : 'Japanese Community'), $grayColor);
+        imagestring($image, 3, 100, 520, 'Author: ' . (mb_check_encoding($cleanAuthorName, 'ASCII') ? $cleanAuthorName : 'Japanese Author'), $grayColor);
         
         // サイトURL
         imagestring($image, 3, 800, 580, 'sanpi-ryoron.com', $grayColor);
