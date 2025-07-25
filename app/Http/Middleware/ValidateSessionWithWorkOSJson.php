@@ -18,7 +18,14 @@ class ValidateSessionWithWorkOSJson
      */
     public function handle(Request $request, Closure $next): Response
     {
+        \Log::info("ValidateSessionWithWorkOSJson middleware: Processing request", [
+            'url' => $request->url(),
+            'method' => $request->method(),
+            'is_json' => $request->expectsJson()
+        ]);
+        
         if (app()->runningUnitTests()) {
+            \Log::info("ValidateSessionWithWorkOSJson middleware: Running unit tests, skipping");
             return $next($request);
         }
 
@@ -26,6 +33,7 @@ class ValidateSessionWithWorkOSJson
 
         if (! $request->session()->get('workos_access_token') ||
             ! $request->session()->get('workos_refresh_token')) {
+            \Log::warning("ValidateSessionWithWorkOSJson middleware: Missing WorkOS tokens, logging out");
             return $this->logout($request);
         }
 
@@ -37,7 +45,12 @@ class ValidateSessionWithWorkOSJson
 
             $request->session()->put('workos_access_token', $accessToken);
             $request->session()->put('workos_refresh_token', $refreshToken);
+            
+            \Log::info("ValidateSessionWithWorkOSJson middleware: WorkOS tokens validated successfully");
         } catch (WorkOSException $e) {
+            \Log::error("ValidateSessionWithWorkOSJson middleware: WorkOS validation failed", [
+                'error' => $e->getMessage()
+            ]);
             report($e);
 
             return $this->logout($request);
@@ -51,6 +64,11 @@ class ValidateSessionWithWorkOSJson
      */
     protected function logout(Request $request): Response
     {
+        \Log::warning("ValidateSessionWithWorkOSJson middleware: Logging out user", [
+            'expects_json' => $request->expectsJson(),
+            'url' => $request->url()
+        ]);
+        
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
@@ -58,12 +76,14 @@ class ValidateSessionWithWorkOSJson
 
         // For JSON requests (AJAX), return JSON error instead of redirect
         if ($request->expectsJson()) {
+            \Log::info("ValidateSessionWithWorkOSJson middleware: Returning JSON auth error");
             return response()->json([
                 'success' => false,
                 'message' => '認証が必要です。再度ログインしてください。'
             ], 401);
         }
 
+        \Log::info("ValidateSessionWithWorkOSJson middleware: Redirecting to home");
         return redirect('/');
     }
 }

@@ -392,25 +392,53 @@ class TopicController extends Controller
      */
     public function destroy(Topic $topic)
     {
-        $user = auth()->user();
-        
-        // 作成者のみ削除可能
-        if ($topic->user_id !== $user->id) {
-            \Log::warning("User {$user->id} tried to delete topic {$topic->id} without permission");
+        try {
+            \Log::info("DELETE request received for topic {$topic->id}");
+            
+            $user = auth()->user();
+            
+            if (!$user) {
+                \Log::error("No authenticated user found for topic deletion");
+                return response()->json([
+                    'success' => false,
+                    'message' => '認証が必要です'
+                ], 401);
+            }
+            
+            \Log::info("Authenticated user: {$user->id}, Topic owner: {$topic->user_id}");
+            
+            // 作成者のみ削除可能
+            if ($topic->user_id !== $user->id) {
+                \Log::warning("User {$user->id} tried to delete topic {$topic->id} without permission");
+                return response()->json([
+                    'success' => false,
+                    'message' => '削除権限がありません'
+                ], 403);
+            }
+
+            \Log::info("Permission check passed, updating topic status");
+            $topic->update(['status' => 'deleted']);
+            
+            \Log::info("User {$user->id} deleted topic {$topic->id}");
+
+            return response()->json([
+                'success' => true,
+                'message' => '議題を削除しました'
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error("Error in TopicController::destroy: " . $e->getMessage(), [
+                'topic_id' => $topic->id ?? 'unknown',
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => '削除権限がありません'
-            ], 403);
+                'message' => 'エラーが発生しました'
+            ], 500);
         }
-
-        $topic->update(['status' => 'deleted']);
-        
-        \Log::info("User {$user->id} deleted topic {$topic->id}");
-
-        return response()->json([
-            'success' => true,
-            'message' => '議題を削除しました'
-        ]);
     }
 
     /**
