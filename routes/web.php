@@ -30,22 +30,49 @@ Route::get('/og-image/topic/{id}', function ($id) {
         }
         
         $ogImageService = new \App\Services\SimpleOgImageService();
-        $imageUrl = $ogImageService->generateTopicOgImage(
+        $filename = $ogImageService->generateTopicOgImage(
             $topic->id,
             $topic->title,
             $topic->community->name ?? 'Unknown',
             $topic->user->name ?? 'Anonymous'
         );
         
-        return redirect($imageUrl);
+        // 使用するディスクを決定
+        $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
+        
+        if ($disk === 's3') {
+            // S3から画像データを取得して直接レスポンス
+            if (!\Illuminate\Support\Facades\Storage::disk('s3')->exists($filename)) {
+                abort(404);
+            }
+            
+            $imageData = \Illuminate\Support\Facades\Storage::disk('s3')->get($filename);
+            return response($imageData)
+                ->header('Content-Type', 'image/png')
+                ->header('Cache-Control', 'public, max-age=31536000')
+                ->header('Expires', gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000));
+        } else {
+            // ローカルファイルシステムから画像データを直接レスポンス
+            $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($filename);
+            
+            if (!file_exists($fullPath)) {
+                abort(404);
+            }
+            
+            return response()->file($fullPath, [
+                'Content-Type' => 'image/png',
+                'Cache-Control' => 'public, max-age=31536000',
+                'Expires' => gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000)
+            ]);
+        }
+        
     } catch (\Exception $e) {
         \Log::error('OG Image generation failed: ' . $e->getMessage(), [
             'topic_id' => $id,
             'trace' => $e->getTraceAsString()
         ]);
         
-        // フォールバック：デフォルト画像にリダイレクト
-        return redirect('/images/default-og-image.png');
+        abort(404);
     }
 })->name('og-image.topic');
 

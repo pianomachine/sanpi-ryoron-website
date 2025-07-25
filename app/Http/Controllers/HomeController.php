@@ -270,14 +270,8 @@ class HomeController extends Controller
             abort(404);
         }
         
-        // OG画像URLを生成
-        $ogImageService = new \App\Services\SimpleOgImageService();
-        $ogImageUrl = url($ogImageService->generateTopicOgImage(
-            $topic->id,
-            $topic->title,
-            $topic->community->name ?? 'Unknown',
-            $topic->user->name ?? 'Anonymous'
-        ));
+        // OG画像URLを生成（専用ルート経由）
+        $ogImageUrl = route('og-image.topic', ['id' => $topic->id]);
 
         // 投票割合を計算（認証済み + 匿名投票の合計）
         $authSupportVotes = \App\Models\TopicVote::where('topic_id', $topic->id)
