@@ -72,10 +72,15 @@ interface LinkPreviewsProps {
 }
 
 export function LinkPreviews({ previews, className = '' }: LinkPreviewsProps) {
+    console.log('LinkPreviews component - previews:', previews);
+    
     if (!previews || previews.length === 0) {
+        console.log('LinkPreviews component - no previews to display');
         return null;
     }
 
+    console.log('LinkPreviews component - rendering', previews.length, 'previews');
+    
     return (
         <div className={`space-y-3 ${className}`}>
             {previews.map((preview, index) => (
